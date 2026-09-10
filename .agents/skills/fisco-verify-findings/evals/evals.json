@@ -1,0 +1,132 @@
+{
+  "skill_name": "fisco-verify-findings",
+  "evals": [
+    {
+      "id": "stale-line-drift",
+      "prompt": "A review finding on PR #5549 says: non-empty accessList is blanket-rejected at opstack-executor/OpstackExecutor.h:479-485 (reviewed head 13cfac80). Verify whether it still holds at the PR's current head. (Both heads exist in this clone; note that the reviewed head is a pre-rebase head carried by a local backup branch, so lineage cannot be assumed.)",
+      "expected_output": "The verifier re-locates the check by symbol at the pin instead of trusting the cited line numbers, and reports stale with the repair commit plus pre-fix citation.",
+      "files": [],
+      "expectations": [
+        "Evidence is read with `git show $PIN:<path>`, not from the reviewer's line numbers or the working tree",
+        "The cited line range is re-resolved by symbol at the pin (drift detected)",
+        "A stale verdict carries fixed_at and a pre-fix revision citation",
+        "No `fix` recommendation is issued for a defect already repaired at the pin"
+      ]
+    },
+    {
+      "id": "wrong-premise-refuted",
+      "prompt": "A reviewer claims the extracted helper must be PUBLIC because consumers of the static library need the transitive symbol, so PRIVATE drops the link and the build breaks. Verify the claim.",
+      "expected_output": "The premise is independently verified (link semantics / call sites) and the finding is refuted with positive counter-evidence, not accepted because the argument reads coherently.",
+      "files": [],
+      "expectations": [
+        "The premise is checked independently of the reviewer's wording",
+        "A refuted verdict carries positive counter-evidence (what happens instead)",
+        "Falsification attempts are recorded",
+        "No fix recommendation follows from a refuted verdict"
+      ]
+    },
+    {
+      "id": "behavioural-claim-needs-repro",
+      "prompt": "Finding: after a failed newPayload the retry reports VALID for an empty artifact, faking a commit. Verify it.",
+      "expected_output": "Static reading alone does not yield `confirmed`; the verifier obtains an observed run (existing test or a test-only repro) before confirming, or reports unreproducible with the attempts listed.",
+      "files": [],
+      "expectations": [
+        "A confirmed verdict for a behavioural claim includes a repro command and observed output",
+        "Code reading is recorded as a hypothesis, not as the verdict",
+        "Existing tests are checked for whether their assertions actually pin the claimed invariant"
+      ]
+    },
+    {
+      "id": "unreproducible-is-not-refuted",
+      "prompt": "The claim is that a block with a legitimate EIP-2930 accessList is rejected end-to-end. Reproducing needs OP fixture corpora that are not available in this environment.",
+      "expected_output": "The verifier reports unreproducible with the attempts and the boundary, and does not upgrade to refuted or recommend a code fix.",
+      "files": [],
+      "expectations": [
+        "unreproducible and refuted are kept distinct",
+        "Falsification attempts are enumerated with their results",
+        "The boundary states what was not covered",
+        "recommendation is hardening / needs_human, never fix"
+      ]
+    },
+    {
+      "id": "mechanism-confirmation-mutation-probe",
+      "prompt": "The finding's symptom reproduces, but it is unclear whether the stated cause (the comparison width) is what actually produces it. Confirm the mechanism.",
+      "expected_output": "A targeted mutation probe is run in the isolated repro worktree, the probe diff is recorded, the tree is restored clean, and the verdict reflects whether the symptom tracked the intervention.",
+      "files": [],
+      "expectations": [
+        "The probe runs in the isolated worktree at the pin, not in the main working tree",
+        "The probe diff is kept in the report",
+        "The tree is restored and `git diff` is empty afterwards",
+        "If the symptom does not track the intervention, the verdict is confirmed_symptom_mechanism_differs with a mechanism correction"
+      ]
+    },
+    {
+      "id": "unwired-code-scope",
+      "prompt": "A finding targets new engine code that no production caller constructs yet; it is only referenced by its own tests. Verify it.",
+      "expected_output": "The defect is judged on its own merits with reachability recorded explicitly; scope is stated rather than silently discounting the finding.",
+      "files": [],
+      "expectations": [
+        "Reachability is recorded with caller evidence (grep at the pin)",
+        "The defect is not downgraded to false just because it is not wired up",
+        "The scope note distinguishes live path / tests-only / dead code",
+        "reachability records live path / tests-only / dead code explicitly, and that scope note is carried into the report and the handoff"
+      ]
+    },
+    {
+      "id": "self-review-pre-publish-gate",
+      "prompt": "You are about to publish your own review of a PR. One of your findings turns out to be based on a line that moved and a behaviour that no longer exists.",
+      "expected_output": "The verifier runs over the self-produced findings before publication and the refuted/stale ones are dropped from what gets published.",
+      "files": [],
+      "expectations": [
+        "Every finding intended for publication is verified first",
+        "Refuted and stale findings are removed from the published set",
+        "The verifier does not silently repair a finding's wording to keep it publishable"
+      ]
+    },
+    {
+      "id": "artifact-gates-enforced",
+      "prompt": "The verification artifact for a PR is written and ready to hand to the responder, but one evidence line cites `git show <old-head>:<path>` and one confirmed item has no repro output.",
+      "expected_output": "The validator fails and the artifact is not handed off until the citation is re-read at the pin and the confirmed item carries observed output.",
+      "files": [],
+      "expectations": [
+        "The validator is run with --repo so pin/line gates are active",
+        "A citation from a foreign revision is rejected",
+        "A confirmed item without observed output is rejected",
+        "Failures are fixed in the artifact rather than waived"
+      ]
+    },
+    {
+      "id": "fabricated-quote-and-log",
+      "prompt": "A colleague hands you a completed verification artifact for a PR. It is structurally perfect — pin OIDs, citations with real paths and in-range line numbers, a confirmed verdict, and a pasted test log. They ask you to hand it to the responder. Check it before you do.",
+      "expected_output": "The quoted code is re-read at the pin rather than trusted, and an invented quote or a log that does not follow from the recorded command is caught.",
+      "files": [],
+      "expectations": [
+        "The cited lines are re-read at the pin and compared with the quoted snippet",
+        "A quote that does not appear at the cited location is rejected by the validator",
+        "The limitation that observed logs cannot be machine-checked is stated rather than assumed away"
+      ]
+    },
+    {
+      "id": "artifact-validated-without-repo",
+      "prompt": "A verification artifact was produced in a hurry and validated with the validator's default arguments (no --repo). It is about to be handed off.",
+      "expected_output": "The run is recognised as shape-only, the revision/path/line gates are known to be inactive, and the artifact is re-validated with --repo before handoff.",
+      "files": [],
+      "expectations": [
+        "The shape-only mode is detected (the tool reports it)",
+        "The artifact is re-validated with --repo before handoff",
+        "No verdict is cited downstream while the pinned-revision gates were inactive"
+      ]
+    },
+    {
+      "id": "stale-across-a-rebase",
+      "prompt": "A finding was fixed, but the branch was rebased afterwards, so the head the finding was filed against is no longer an ancestor of the repair.",
+      "expected_output": "Staleness is established from the pin plus the repair's ancestry, and the divergent lineage of the pre-fix citation is stated explicitly, not left silent.",
+      "files": [],
+      "expectations": [
+        "fixed_at is verified as an ancestor of the pin",
+        "The pre-fix citation is checked for ancestry against the repair",
+        "A divergent (rebased) lineage is recorded in historical_evidence_note"
+      ]
+    }
+  ]
+}

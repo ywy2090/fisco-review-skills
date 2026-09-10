@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "pin": {
+    "head": "98bc3b781601f4bff0de1e6a2572c66776023e13",
+    "base": "592361280e47224db7b728d417da364ae4f769a7",
+    "ref": "refs/verify/pr-5549/head-98bc3b781601f4bff0de1e6a2572c66776023e13",
+    "verified_at": "2026-09-10T00:00:00Z"
+  },
+  "source": "review_artifact",
+  "items": [
+    {
+      "id": "F1",
+      "source_ref": "review_5549.json:comments[0] (path opstack-executor/OpstackExecutor.h, line 482, side RIGHT)",
+      "claim_verbatim": "⚠️ [IMPORTANT] [BLOCKING] Non-empty accessList blanket-rejected: legitimate EIP-2930 txs can never land — Matching envelope+mirror accessLists still rejected on both block paths → op-geth-legal blocks INVALID (follower stall), self-built blocks silently exclude type-1 txs.",
+      "subclaims": {
+        "location": {
+          "text": "检查位于 opstack-executor/OpstackExecutor.h:479-485（reviewer 引用 head 13cfac80）",
+          "verdict": "refuted",
+          "evidence": [
+            "git show $PIN:opstack-executor/OpstackExecutor.h:736-750 — 该 pin 上 accessList 绑定逻辑位于 742-750，479-485 已是无关代码"
+          ]
+        },
+        "mechanism": {
+          "text": "任何非空 mirror accessList 一律拒绝，不与环境变量信封自身的 list 比较",
+          "verdict": "refuted",
+          "evidence": [
+            "git show $PIN:opstack-executor/OpstackExecutor.h:742-747 — accessListPayload 存在时走 bindEnvelopeAccessList 逐元素比对",
+            "git show $PIN:opstack-executor/OpstackExecutor.h:748-750 — 仅在信封无该字段时才拒绝非空 mirror list"
+          ]
+        },
+        "impact": {
+          "text": "op-geth 合法块被判 INVALID、type-1 交易无法出块",
+          "verdict": "refuted",
+          "evidence": [
+            "git show $PIN:opstack-executor/OpstackExecutor.h:736-741 — 代码注释记录该形态已被修复为双向逐元素比对"
+          ]
+        },
+        "premise": {
+          "text": "op-geth 接受信封与镜像一致的 accessList",
+          "verdict": "not_claimed",
+          "note": "本条判定不需要参考实现行为：pin 上已按同语义逐元素比对，声称的拒绝路径不再可达"
+        }
+      },
+      "verdict": "stale",
+      "evidence": [
+        "git show $PIN:opstack-executor/OpstackExecutor.h:742-750 — 逐元素绑定取代无条件拒绝"
+      ],
+      "historical_evidence": [
+        "git show 13cfac80f6b1dcb9811e657f5827ceb19b99db4b:opstack-executor/OpstackExecutor.h:479-485 — 当时为 `if (!evmTx.access_list.empty())` / `return \"accessList is not bound to the signed envelope\";`，声称成立"
+      ],
+      "historical_evidence_note": "13cfac80 是 PR #5549 rebase 前的 head，与修复 commit b5c05a1e 不在同一 lineage（merge-base 为 cad9edb80146），本地仅经分支 d-cutover-backup-8e9928d50 可达，因此不能靠祖先关系判断；修复 commit 本身是 pin 的祖先，且 pin 上已无该无条件拒绝。",
+      "fixed_at": "b5c05a1e679880a869336e98b49907ad97cf02d1",
+      "resolution_evidence": [
+        "git merge-base --is-ancestor b5c05a1e679880a869336e98b49907ad97cf02d1 $PIN → 是 pin 的祖先",
+        "git show $PIN:opstack-executor/OpstackExecutor.h:312-360 — bindEnvelopeAccessList 逐元素比对本信封 list 与镜像 list"
+      ],
+      "reachability": {
+        "on_live_path": true,
+        "evidence": [
+          "git grep -n envelopeExecutionFieldsMismatch $PIN -- opstack-executor — OpBlockExecute 块校验路径调用"
+        ],
+        "scope_note": "修复位于 OP 块校验/构建的 live 生产路径，不是仅测试接线的代码"
+      },
+      "repro": null,
+      "falsification_attempts": [
+        {
+          "attempt": "核对 reviewer 的引用 head 13cfac80 是否为本分支历史（可能只是 head 漂移而缺陷仍在）",
+          "result": "13cfac80 与修复 commit b5c05a1e 不在同一 lineage（merge-base cad9edb80146），祖先关系不可用；改用 pin 上的实码核对：无条件拒绝已不存在，且 b5c05a1e 经 `git merge-base --is-ancestor` 确认为 pin 的祖先，故不是单纯漂移"
+        },
+        {
+          "attempt": "检查是否仍有形态能让非空合法 list 走到拒绝分支",
+          "result": "type-1 交易信封必含 accessList 字段 → 走 bindEnvelopeAccessList；仅 legacy/0x7e 无字段形态拒绝非空 mirror list，属预期行为"
+        }
+      ],
+      "mutation_probe": null,
+      "boundary": "静态判定：未跑 opstack-executor-tests 复现原始失败，也未验证修复后 op-geth 合法块的端到端接受（需 fixture/节点）",
+      "residual_risk": "修复的逐元素比对是否与 op-geth 语义完全一致（顺序、重复项）未在本轮验证；该语义由独立的执行器测试承担",
+      "recommendation": "defer"
+    }
+  ],
+  "totals": {
+    "stale": 1
+  }
+}
