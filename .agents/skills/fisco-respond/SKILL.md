@@ -1,6 +1,6 @@
 ---
 name: fisco-respond
-version: 2.0.0
+version: 2.1.0
 description: Process a review of your own FISCO-BCOS C++ PR — triage each severity-tagged finding, fix it with a regression test, reply on each comment thread with one sentence ("Fixed in <sha> — ..." / "Not changed — ..."), and post a round summary reply carrying the evidence. Use when your FISCO-BCOS PR has review comments or review rounds to address, when a reviewer posts BLOCKER/HIGH/MEDIUM/LOW findings on your diff, or when you must respond to a reviewer before the next round. Not for reviewing a PR (your own or someone else's) — that is fisco-review.
 ---
 
@@ -30,6 +30,7 @@ This repo's reviews (see the #5544/#5547 engine-split history) are **round-based
    - Post inline replies as thread replies (`POST repos/$REPO/pulls/$PR/comments` with `body` + `in_reply_to`); the thread already notifies the reviewer, so no `@mention` inline. `Feel free to resolve.` belongs in the summary reply, never inline.
    - GitHub prose is English even when the finding was filed in Chinese.
    - Don't reply with empty bodies, and don't resolve a thread you haven't changed or justified.
+   - **A `Fixed` is a conjunction of facts, not a sentiment** — the six conditions in "The `Fixed` evidence gate" below must all hold before this reply leaves; a condition you cannot check leaves the item at `Pending decision`, never at `Fixed`. Post-time bookkeeping (intent + nonce, timeout recovery, post-write re-read) lives in the same section.
 6. **Disclose before the next round.** If the fix changes what the live service answers (status codes, comparison width, version windows), update the PR description (the repo tracks such leftover semantics in a "Leftover semantics" note) and the ChangeLog if Engine API behaviour is tracked there. Re-check your test-plan checkboxes. **Verify the disclosure against the code before pushing**: a disclosed behaviour (the description says "answers SYNCING", "compares 16 fields") must equal what the code does — a mis-disclosure blocks the reviewer's convergence and reads as a new finding.
 7. **Push a new head, then post the round summary reply.** The summary is a PR issue comment — not another thread reply — and it is where every detail the inline replies deliberately omit belongs: per-finding status, the mechanism, the named test, the verification path, the behaviour-change disclosure, and the rejection's evidence. Its first line is `@<reviewer> — <overall handling status>` and it names the head you just pushed (the reviewer re-checks every prior finding at that sha); `Feel free to resolve.` appears here and nowhere else. When several reviewers filed findings, post one summary per reviewer, each opening with its own `@mention`.
    Shape (the reviewer re-checks prior findings against it):
@@ -64,6 +65,23 @@ This repo's reviews (see the #5544/#5547 engine-split history) are **round-based
    ```
 
    Status vocabulary: `Fixed` / `Fixed incidentally` / `Partially adopted` / `Not changed` / `Acknowledged, logged for follow-up` / `Pending decision`. State which prior findings are closed at `<sha>` and which you deliberately left, so the reviewer can re-check quickly instead of rediscovering.
+
+## The `Fixed` evidence gate
+
+Grafted from the author-side corpus (`fisco-handle-reviews` 1.10.x), which treated a `Fixed` claim as a conjunction of six machine-checkable facts. The vocabulary here is `Fixed` / `Not changed`; the gate is what makes either word mean something.
+
+1. **Reproduced first.** The finding fired at your head before you touched code (step 2). A fix for a finding you never reproduced is a guess — say `Not changed — could not reproduce at <sha>` instead.
+2. **Every touched target built and run.** Step 5's closure, naming the affected-target list; the regression test named after the pinned behaviour fails before the fix and passes after.
+3. **The commit is on the PR's live head chain.** Re-read it after pushing (`git merge-base --is-ancestor <sha> HEAD` against the pushed head, or `git ls-remote` on the branch). A commit that exists only locally is not a fix, and the sha in your reply must be one the reviewer can fetch.
+4. **Class-level findings have a completed category scan.** The invariant was swept across its entry points and the sweep's result is in the summary — the reviewer re-reads the whole finding at the next head, so "the named instance is patched" is not the claim being checked.
+5. **Every cited `file:line` was re-read at the final commit.** Fix commits drift line numbers (three drifts were caught in one round at #5544); verify the location *before* naming it in the reply, never after.
+6. **An independent verifier confirms the high tier.** For a `HIGH`/`BLOCKER` fix, or any fix that changes what the live service answers, a verifier who reads the finding, the final commit/diff, the head source and the test output — and **must not read your drafted reply or your reasoning** — confirms the fix. A confident explanation is not a substitute for an independent read; a result that is not `confirmed` leaves the item open, and the verifier re-runs after the head moves.
+
+For **`Not changed`** the standard is falsification, not preference: either the mechanism you cite disproves the finding's premise, or a compatibility judgement names who is affected and why that is acceptable. "It compiles" is not evidence for a CMake/include finding, and a premise you did not check is a rejection that will be reopened.
+
+**Reply bookkeeping.** Before posting, persist the intent: target head, the source comment's `updated_at` + body hash, the thread id, the body hash, the authorization time. Append an invisible `<!-- fisco-reply:<nonce> -->` marker to the body so a "server accepted, client timed out" outcome is recoverable from the remote by nonce — **never re-post blindly**; a duplicate reply is worse than a late one. After a successful write, re-read the source version once; if it changed while you were posting, state `posted_then_source_changed` in the summary rather than claiming the reply answers the current version. Generate each body *from* the ledger, never write the reply first and backfill the evidence — and do not resolve a thread you have neither changed nor justified.
+
+The review directory and its ledgers are the evidence the next round reads. Keep them untracked and never clean them up with a wildcard.
 
 ## Traps from this repo's history
 

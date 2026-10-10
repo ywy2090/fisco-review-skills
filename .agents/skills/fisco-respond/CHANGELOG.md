@@ -4,6 +4,17 @@ Versioned as a pair with `fisco-review`; the two bump their `version:` fields in
 
 Semver policy: **MAJOR** = change to the reply format or the triage/fix semantics; **MINOR** = additive (new traps, new checklist references); **PATCH** = wording, link, or budget tweaks.
 
+## [2.1.0] - 2026-10-10
+### Added (merging the sibling author-side corpus — `fisco-handle-reviews` 1.10.x — into this skill)
+- **"The `Fixed` evidence gate" (new section)** — six conditions, all required before a `Fixed` reply leaves: the finding was reproduced at the head first; every touched target was built and run with a regression that fails before the fix and passes after; the commit is on the PR's **live head chain** (re-read after pushing — a local-only commit is not a fix); class-level findings have a completed **category scan**, not just the named instance; every cited `file:line` was re-read at the final commit (fix commits drift lines — three drifts caught in one round at #5544); and an **independent verifier** confirms high-tier or behaviour-changing fixes, barred explicitly from reading the author's drafted reply or reasoning. A condition that cannot be checked leaves the item at `Pending decision` — never at `Fixed`.
+- **`Not changed` standard sharpened** — falsification of the finding's premise, or a compatibility judgement naming who is affected and why it is acceptable. "It compiles" is not evidence for a CMake/include finding, and an unchecked premise is a rejection that reopens.
+- **Reply bookkeeping (grafted from the corpus's posting protocol)** — persist the intent before posting (target head, source `updated_at` + body hash, thread id, body hash, authorization) and append an invisible `<!-- fisco-reply:<nonce> -->` marker so a timed-out post is recovered from the remote by nonce instead of being re-posted (a duplicate reply is worse than a late one); re-read the source version once after a successful write and report `posted_then_source_changed` rather than claiming the reply answers a version that moved; generate bodies *from* the ledger, never backfill evidence into a written reply.
+- **Evidence retention** — the review directory and its ledgers are the evidence the next round reads: keep them untracked, never wildcard-clean them.
+- **`references/self-check.md` traps 14–19 (new)** — close-out verified at a *different* occurrence than the one the reviewer named (#5495-r4); sibling default sites left behind after a fail-closed flip (#5496-r3); line drift between fix commits (#5544); evidence retrofitted to a reply; two field names for one quantity (write/read pair mismatch); and a newly added test whose pin is not discriminating (exception type shared by three production sites).
+
+### Notes
+- The inline one-sentence format, the round-summary shape and the status vocabulary are **unchanged** — MINOR, additive gates only.
+
 ## [2.0.0] - 2026-09-15
 ### Changed (reply format — the house definition, which this skill had drifted from)
 - **Inline replies are one sentence.** `Fixed in <short-sha> — <one sentence: what changed>`, `Fixed in <short-sha> — <changed part>; <unchanged part> kept as-is because <reason>`, `Not changed — <one sentence, evidence-based reason>`. The em dash is the separator; the old `Fixed in <sha>: <change>; covered by the new <test_name> test.` colon-plus-semicolon template is gone, and so is the invented `Leaving <X>:` reject form (the house vocabulary is `Not changed` / `Partially adopted` / `Fixed incidentally` / `Acknowledged, logged for follow-up` / `Pending decision`).

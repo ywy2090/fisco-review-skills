@@ -32,3 +32,15 @@ A fix most often reopens a round by one of these:
 12. **Column-limit sweep on touched files** — `grep -cE "^.{101,}$"` against the repo's `ColumnLimit: 100` before pushing; identifier-lengthening renames push wrapped lines over without any semantic diff.
 
 13. **Copied comments are re-derived, not re-typed** — when porting a rationale comment from an origin file (or writing a mechanism explanation for your own fix), verify every sentence still describes THIS copy's code from the C++ semantics, not from the origin's phrasing: a `shared_ptr` move nulls the pointer and leaves the pointee untouched (no "moved-from member"); a truncated origin sentence drops the loop/branch it explains. A wrong-mechanism comment gets quoted forward into the next reader's model. → 本仓库：#5548 的 blockHash-copy 注释声称 "leaves the blockHash member moved-from"——实际是 commonEntry 为 null、成员未被触碰（外部 round-1 F6 抓到）。
+
+14. **Close-out at the named site** — verifying a claim by showing a *different* occurrence than the one the reviewer named (a neighbouring comment, another copy of the helper, the wrong entry in a list). The named site is what the next round re-reads: `git show` that exact path and, if the review named a comment, that comment's own text at the final commit. → 本仓库：#5495-r4 — the close-out showed another annotation while the reviewer's named `TransactionResponse` comment kept the old wording, and the finding reopened.
+
+15. **A fail-closed flip leaves sibling default sites behind** — after one path stops substituting a default, enumerate the other functions in the same TU that consume the same missing-data family. "This path no longer has a default" is not "the category is gone". → 本仓库：#5496-r3 — `CallRequest` wrote a default fee into one field while the signer read another.
+
+16. **Line drift between fix commits** — a `file:line` cited in a reply is re-read at the final commit; fix commits move lines, and a stale location makes the reviewer's verification fail on a correct fix. → 本仓库：#5544 — three drifts caught in one round.
+
+17. **Evidence retrofitted to the reply** — writing the reply body first and then looking for support. Generate every body *from* the ledger, and self-read each claim against the tree before posting.
+
+18. **Two field names for one quantity** — the fix writes into one field of a read/write pair while the consumer reads the other (fee, nonce, version or config pairs). When a fix touches such a pair, grep both sides and confirm the producer and the consumer name the same field.
+
+19. **A new test whose pin is not discriminating** — asserting an exception *type* that three production sites throw with different `what()`, or a field count, or an outcome without the invariant. Pin the unique signal (message, discriminator value) or mutate the production code to prove the test can see the difference.

@@ -2,6 +2,8 @@
 
 A "golden set" is a list of **known-missed findings with ground truth** — a finding an earlier version of this skill failed to report at a specific head, discovered independently by the external reviewer (kyonRay). Each entry is a retrievable test: when the skill is changed, the change must name the golden entry it makes the skill hit (Maintenance rule in SKILL.md). A checklist item added without a golden entry (or a concrete finding) is unverified growth.
 
+This is the **graduated** tier. The intake tier — candidates with a trigger count that have not earned an item yet, plus the migration table for the corpus merged in v2.1.0 — is [lessons-pending.md](lessons-pending.md): a rule lives there until it can name ground truth here.
+
 The canonical source is the #5549 post-mortem: two independent reviews of head `ffedf65203a31` — kyonRay's single-pass review vs this skill's parallel-subagent full round. kyonRay filed 10 findings; this skill filed 9, shared 2, and **missed 8**. Those 8 are the golden set. Each entry: what was missed, the checklist rule it now maps to, and the signal that should trigger it.
 
 ## Golden entries (the 8 missed #5549 findings)
@@ -23,6 +25,6 @@ The skill is not uniformly worse — it filed 7 findings kyonRay missed at the s
 
 ## How to use the golden set
 
-1. **When changing the skill** (new checklist item, delegation rule, mode): state which golden entry it makes the skill hit. If none, it is unverified growth and should not be added without a fresh, named finding.
+1. **When changing the skill** (new checklist item, delegation rule, mode): state which golden entry it makes the skill hit. If none, it is unverified growth and should not be added without a fresh, named finding — a rule with an incident but no ground truth goes to [lessons-pending.md](lessons-pending.md) as a candidate instead, and graduates (gaining both an item and an entry here) only after ≥2 triggers across ≥2 PRs or ≥2 independent modules.
 2. **When the skill next reviews a PR**: after the report, check whether any golden signal was present in the diff and whether the skill hit it. A golden signal present but unhit is a regression regardless of what else the report says.
 3. **Cost discipline**: the golden set is the reason the delegation budget is now a hard cap and cross-file symmetry moved to the aggregator — G1/G5 are cross-file, and the parallel round that missed them also ran 2.4–5.6M tokens per agent. Recall and cost are tracked together.

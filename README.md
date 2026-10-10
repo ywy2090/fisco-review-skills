@@ -1,7 +1,7 @@
 # FISCO-BCOS Review Skills
 
 Three agent skills for the FISCO-BCOS C++ PR workflow. `fisco-review` and `fisco-respond` are a
-versioned pair (current: **v2.0.0**); `fisco-verify-findings` is versioned independently
+versioned pair (current: **v2.1.0**); `fisco-verify-findings` is versioned independently
 (current: **v1.1.0**).
 
 | Skill | Purpose |
@@ -34,10 +34,14 @@ cp -r fisco-review/.agents/skills/fisco-verify-findings ~/.claude/skills/
 ├── fisco-review/
 │   ├── SKILL.md            # workflow, modes (delta/full), report format
 │   ├── CHANGELOG.md
-│   ├── references/         # checklist.md, golden-set.md
+│   ├── references/
+│   │   ├── checklist.md    # conventions, 53 numbered rules (discipline + defect classes)
+│   │   ├── golden-set.md   # graduated misses with ground truth
+│   │   ├── lessons-pending.md  # intake tier: candidates, lifecycle, migration table
+│   │   └── methods.md      # executable procedures + mutation isolation contract
 │   └── scripts/            # fetch_pr.py, lock.sh, verify_tree.sh
 ├── fisco-respond/
-│   ├── SKILL.md
+│   ├── SKILL.md            # triage → fix → reply, the Fixed evidence gate
 │   ├── CHANGELOG.md
 │   └── references/         # self-check.md
 └── fisco-verify-findings/
@@ -47,6 +51,15 @@ cp -r fisco-review/.agents/skills/fisco-verify-findings ~/.claude/skills/
     ├── references/         # intake, method, repro-recipes, report, worked example
     └── scripts/            # validate_verification.py (+59 unit tests), verify_env.sh
 ```
+
+## Provenance
+
+v2.1.0 merges the predecessor corpus — `fisco-review-pr` 2.13.x, `fisco-handle-reviews`
+1.10.x and the shared `checks.md` / `methods.md` bundle — into the `fisco-review` /
+`fisco-respond` pair. The migrated material is inventoried in
+`fisco-review/references/lessons-pending.md` (one row per source lesson, naming the
+checklist item, method or discipline rule it became), so the merge is auditable rather
+than assumed. The predecessor corpus is dormant: this pair is the maintained one.
 
 ## Versioning
 
