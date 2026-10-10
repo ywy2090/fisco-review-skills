@@ -123,6 +123,15 @@ Four rules keep this honest:
 4. **After a sync, run the tests — not only the checker.** Byte-identical files can still ship a
    broken suite: `python3 .agents/skills/fisco-verify-findings/scripts/test_validate_verification.py`
 
+**Aligning the roots.** When a root holds a *copy* instead of a link, `tools/align-roots-by-symlink.sh`
+replaces it with a relative symlink into the install root — dry run by default, `--apply` to
+perform, and every replaced directory is **moved** to `~/.skill-backups/linked-<date>/` (outside
+every skill root, so the backups are not loaded as skills). It refuses to touch a copy that has
+files the canonical root lacks, or that is newer than it, and reports those as NEEDS REVIEW: the
+canonical root is the source of truth, but that is not a licence to delete the only copy of
+something. Both scripts read the same `tools/skill-roots.txt`, so they cannot disagree about which
+roots exist.
+
 ## Independence
 
 `fisco-verify-findings` works standalone: its reproduction recipes use plain `git` and the repo's own

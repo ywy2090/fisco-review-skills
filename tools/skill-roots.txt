@@ -1,0 +1,33 @@
+# Conventional skill roots under $HOME, one per line.
+# Read by tools/check-install-sync.sh (--all-roots sweep) and
+# tools/align-roots-by-symlink.sh, so the two share one definition.
+#
+# The first entry is the canonical install root: it is the content every other
+# root is aligned to, never a target to rewrite.
+.agents/skills
+.claude/skills
+.codex/skills
+.cursor/skills
+.gemini/skills
+.copilot/skills
+.codeium/windsurf/skills
+.continue/skills
+.qoder/skills
+.trae/skills
+.kiro/skills
+.roo/skills
+.factory/skills
+.augment/skills
+.zencoder/skills
+.config/opencode/skills
+.config/goose/skills
+.hermes/skills
+.workbuddy/skills
+.cc-switch/skills
+.openhands/skills
+.qwen/skills
+.codebuddy/skills
+.openclaw/skills
+.vibe/skills
+.junie/skills
+.cline/skills

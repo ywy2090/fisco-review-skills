@@ -42,13 +42,19 @@ for arg in "$@"; do
     esac
 done
 
-DEFAULT_ROOTS=".agents/skills:.claude/skills:.codex/skills:.cursor/skills:\
-.gemini/skills:.copilot/skills:.codeium/windsurf/skills:.continue/skills:\
-.qoder/skills:.trae/skills:.kiro/skills:.roo/skills:.factory/skills:\
-.augment/skills:.zencoder/skills:.config/opencode/skills:.config/goose/skills:\
-.hermes/skills:.workbuddy/skills:.cc-switch/skills:.openhands/skills:.qwen/skills:\
-.codebuddy/skills:.openclaw/skills:.vibe/skills:.junie/skills:.cline/skills"
-ROOTS=${SKILL_ROOTS:-$DEFAULT_ROOTS}
+# The root list lives in tools/skill-roots.txt so this script and
+# tools/align-roots-by-symlink.sh cannot drift apart. SKILL_ROOTS overrides it;
+# the inline list is only a fallback for a tree without the file.
+FALLBACK_ROOTS=".agents/skills:.claude/skills:.codex/skills:.cursor/skills:\
+.config/opencode/skills:.hermes/skills:.workbuddy/skills:.cc-switch/skills:.codebuddy/skills"
+if [ -n "${SKILL_ROOTS:-}" ]; then
+    ROOTS=$SKILL_ROOTS
+elif [ -f "$REPO_ROOT/tools/skill-roots.txt" ]; then
+    ROOTS=$(grep -v '^[[:space:]]*#' "$REPO_ROOT/tools/skill-roots.txt" \
+            | grep -v '^[[:space:]]*$' | paste -sd: -)
+else
+    ROOTS=$FALLBACK_ROOTS
+fi
 
 count_files() {
     find "$1" -type f \
