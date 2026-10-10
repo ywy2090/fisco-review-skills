@@ -132,6 +132,13 @@ canonical root is the source of truth, but that is not a licence to delete the o
 something. Both scripts read the same `tools/skill-roots.txt`, so they cannot disagree about which
 roots exist.
 
+**Freezing.** `tools/freeze-skill.sh [--apply] [--force] <name>...` retires a skill: it verifies
+that every other root reaches it by symlink (or holds a content-identical copy), moves the
+canonical directory to `~/.skill-backups/frozen-<date>/`, removes those root entries, and prints
+the restore command. It refuses to freeze a skill this repo publishes unless `--force`, because
+freezing a published skill removes what you ship — a mistake worth a hard gate rather than a
+convention.
+
 ## Independence
 
 `fisco-verify-findings` works standalone: its reproduction recipes use plain `git` and the repo's own
