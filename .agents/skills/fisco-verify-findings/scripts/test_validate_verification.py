@@ -433,10 +433,127 @@ class RegressionTest(unittest.TestCase):
             item = base_item(**{field: "   "})
             self.assert_fails(artifact(items=[item]), field)
 
-    def test_non_citation_locator_must_say_where_the_fact_comes_from(self):
+    def test_non_citation_locator_is_not_a_code_location(self):
+        """A URL says where the claim came from, not where the code is."""
         item = base_item(evidence=["https://github.com/FISCO-BCOS/FISCO-BCOS/issues/1234 is the tracking issue"])
+        self.assert_fails(artifact(items=[item]), "code-location end")
+
+    def test_locator_next_to_a_citation_is_fine(self):
+        item = base_item(
+            evidence=[
+                "git show $PIN:opstack-executor/OpstackExecutor.h:479-485 — mismatch check",
+                "https://github.com/FISCO-BCOS/FISCO-BCOS/issues/1234 is the tracking issue",
+            ]
+        )
         result = run(artifact(items=[item]))
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_pin_sweep_counts_as_code_location(self):
+        """Absence findings have no line to cite — the pin-anchored sweep is the anchor."""
+        item = base_item(
+            evidence=["git grep -n 'canonicalNonceKey' $PIN -- bcos-executor — 无命中：无任何代码产生该 key"]
+        )
+        result = run(artifact(items=[item]))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_location_subclaim_needs_a_code_location(self):
+        item = base_item()
+        item["subclaims"]["location"]["evidence"] = ["failure shows at line 482 per the test log"]
+        self.assert_fails(artifact(items=[item]), "code-location end")
+
+    def test_stale_requires_a_replayable_path(self):
+        item = base_item(
+            verdict="stale",
+            recommendation="defer",
+            repro=None,
+            fixed_at="c" * 40,
+            resolution_evidence=["git show $PIN:opstack-executor/OpstackExecutor.h:479-485 — compare removed"],
+            historical_evidence=["git show " + "1" * 40 + ":opstack-executor/OpstackExecutor.h:482 — blanket reject"],
+        )
+        item["subclaims"]["mechanism"] = {"text": "x", "verdict": "refuted", "evidence": ["git show $PIN:a.h:1"]}
+        self.assert_fails(artifact(items=[item]), "requires a repro")
+
+    def test_unreproducible_requires_a_replayable_path(self):
+        item = base_item(
+            verdict="unreproducible",
+            recommendation="hardening",
+            repro=None,
+            falsification_attempts=[{"attempt": "ran with 8-byte nonce", "result": "no failure observed"}],
+        )
+        self.assert_fails(artifact(items=[item]), "requires a repro")
+
+    def test_undecidable_may_drop_repro_but_must_name_the_broken_end(self):
+        item = base_item(
+            verdict="undecidable",
+            recommendation="needs_human",
+            repro=None,
+            missing_inputs=["op-geth reference behaviour for matching accessLists — blocks the replayable-path end"],
+        )
+        result = run(artifact(items=[item]))
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_foreign_hex_sweep_is_not_a_code_location(self):
+        """A sweep naming a revision nobody pinned cannot anchor the chain's first end."""
+        with PinRepository() as repo:
+            item = base_item(
+                evidence=["git grep -n 'canonicalNonceKey' " + "9" * 40 + " -- bcos-executor — 无命中"]
+            )
+            data = artifact(
+                pin={"head": repo.head, "base": repo.parent, "ref": "refs/verify/x", "verified_at": "now"},
+                items=[item],
+            )
+            self.assert_fails(data, "code-location end", repo=repo.dir.name)
+
+    def test_sweep_citing_a_pin_prefix_is_a_code_location(self):
+        with PinRepository() as repo:
+            item = base_item(
+                evidence=[f"git grep -n 'canonicalNonceKey' {repo.head[:7]} -- bcos-executor — 无命中"]
+            )
+            data = artifact(
+                pin={"head": repo.head, "base": repo.parent, "ref": "refs/verify/x", "verified_at": "now"},
+                items=[item],
+            )
+            result = run(data, repo=repo.dir.name)
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_historical_line_range_is_checked(self):
+        with PinRepository() as repo:
+            item = base_item(
+                verdict="stale",
+                recommendation="defer",
+                fixed_at=repo.parent,
+                resolution_evidence=["git show $PIN:opstack-executor/OpstackExecutor.h:1 — repair present"],
+                historical_evidence=[
+                    f"git show {repo.parent}:opstack-executor/OpstackExecutor.h:499-600 — pre-fix reject"
+                ],
+            )
+            item["subclaims"]["mechanism"] = {"text": "x", "verdict": "refuted", "evidence": ["git show $PIN:a.h:1"]}
+            data = artifact(
+                pin={"head": repo.head, "base": repo.parent, "ref": "refs/verify/x", "verified_at": "now"},
+                items=[item],
+            )
+            self.assert_fails(data, "outside", repo=repo.dir.name)
+
+    def test_historical_directory_citation_is_rejected(self):
+        with PinRepository() as repo:
+            item = base_item(
+                verdict="stale",
+                recommendation="defer",
+                fixed_at=repo.parent,
+                resolution_evidence=["git show $PIN:opstack-executor/OpstackExecutor.h:1 — repair present"],
+                historical_evidence=[f"git show {repo.parent}:opstack-executor:1-2 — sweep"],
+            )
+            item["subclaims"]["mechanism"] = {"text": "x", "verdict": "refuted", "evidence": ["git show $PIN:a.h:1"]}
+            data = artifact(
+                pin={"head": repo.head, "base": repo.parent, "ref": "refs/verify/x", "verified_at": "now"},
+                items=[item],
+            )
+            self.assert_fails(data, "need a blob", repo=repo.dir.name)
+
+    def test_exit_code_true_is_not_an_integer(self):
+        item = base_item()
+        item["repro"]["exit_code"] = True
+        self.assert_fails(artifact(items=[item]), "exit_code")
 
     def test_invented_code_quote_is_rejected(self):
         """A citation proves where the author looked, not that the line says what they claim."""

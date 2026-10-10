@@ -61,7 +61,15 @@
         ],
         "scope_note": "修复位于 OP 块校验/构建的 live 生产路径，不是仅测试接线的代码"
       },
-      "repro": null,
+      "repro": {
+        "tier": "static",
+        "claim_kind": "structural",
+        "command": "git show $PIN:opstack-executor/OpstackExecutor.h:742-750",
+        "expected": "pin 上不再有「非空 accessList 一律拒绝」的分支；accessListPayload 存在时调用 bindEnvelopeAccessList 逐元素比对，仅信封无该字段时才拒绝非空 mirror list",
+        "observed": "    if (accessListPayload)\n    {\n        if (auto err =\n                bindEnvelopeAccessList(*accessListPayload, accessListIsList, evmTx.access_list))\n            return err;\n    }\n    else if (!evmTx.access_list.empty())\n    {\n        return \"accessList is not bound to the signed envelope\";\n    }",
+        "exit_code": null,
+        "modifies_production_code": false
+      },
       "falsification_attempts": [
         {
           "attempt": "核对 reviewer 的引用 head 13cfac80 是否为本分支历史（可能只是 head 漂移而缺陷仍在）",

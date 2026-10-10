@@ -26,13 +26,13 @@
       "subclaims": {
         "location":  {"text": "OpstackExecutor.h:479-485", "verdict": "confirmed", "evidence": ["git show $PIN:opstack-executor/OpstackExecutor.h:479-485 — 无对照比较"]},
         "mechanism": {"text": "任何非空 list 一律拒绝", "verdict": "confirmed", "evidence": ["git show $PIN:opstack-executor/OpstackExecutor.h:482-483"]},
-        "impact":    {"text": "op-geth 合法块被判 INVALID", "verdict": "confirmed", "evidence": ["opstack-executor-tests --gtest_filter=*AccessList* 输出"]},
+        "impact":    {"text": "op-geth 合法块被判 INVALID", "verdict": "confirmed", "evidence": ["opstack-executor-tests --run_test=*AccessList* 输出"]},
         "premise":   {"text": "op-geth 接受一致的 list", "verdict": "not_claimed", "note": "本条未依赖外部参考实现行为"}
       },
       "verdict": "confirmed",
       "evidence": ["git show $PIN:opstack-executor/OpstackExecutor.h:479-485 — `if (!evmTx.access_list.empty()) return \"accessList is not bound to the signed envelope\";`"],
       "reachability": {"on_live_path": true, "evidence": ["git grep -n envelopeExecutionFieldsMismatch $PIN -- opstack-executor"], "scope_note": "由 OpBlockExecute 的块校验路径调用"},
-      "repro": {"tier": "unit_test", "command": "…", "expected": "…", "observed": "…", "exit_code": 1, "duration_s": 12, "modifies_production_code": false},
+      "repro": {"tier": "unit_test", "claim_kind": "behavioural", "command": "…", "expected": "…", "observed": "…", "exit_code": 1, "duration_s": 12, "modifies_production_code": false},
       "falsification_attempts": [{"attempt": "查上游是否已拒绝该形态", "result": "无上游守卫，检查无条件执行"}],
       "mutation_probe": null,
       "boundary": "单节点、Release、仅 accessList 路径；未跑 OP 主网回放",
@@ -52,13 +52,14 @@
 字段义务（`scripts/validate_verification.py` 强制；带 `--repo` 时另加 revision/路径/行号/引用内容/修复血缘的机械校验）：
 
 - 通用：`id` 唯一且非空、`source_ref` 非空、`claim_verbatim` 原样且 ≥20 字、`evidence` 非空、四个子声称各有 verdict 与证据（`not_claimed` 要写 `note`）、`reachability` 显式且 `scope_note` 非空、`boundary` 与 `residual_risk` 非空、`recommendation` 取值合法。
+- **完整证据链**（两端齐备才收判定）：①代码位置——item `evidence` 与 `location` 子声称各含至少一个指向 pin 代码的锚点（`git show <pin>:<path>` 引用，或声称"无此类代码"时 pin 锚定的 `git grep`/`git log` 扫描）；纯 locator（测试日志、URL、评论链接）不算位置。②可复现路径——除 `undecidable` 外每个 item 的 `repro` 非 null；`undecidable` 可断此端，但 `missing_inputs` 必须写明缺什么输入才能把链补全。
 - 每条证据里的每个 `git show` 引用都要指向本 artifact 的 pin（head 或 base，均为不可变 revision）、路径在该 revision 上是 **blob**、行范围在文件内；写在反引号里的代码片段必须真的出现在所引位置（shell 命令与变量插值除外）。仅 `stale` 的 `historical_evidence` 可引其它 revision，且不得引 pin 自身，引用的 revision 必须可解析。
 - 子声称一律相对 pin 判定：`stale` 项的 `mechanism` 在 pin 上必须是 `refuted`（缺陷已修掉），修复前为真的一面写进 `historical_evidence`。任一子声称被判 `refuted` 时 item verdict 不得是 `confirmed`（机制错但症状真 → `confirmed_symptom_mechanism_differs`）；`premise` 为 `undecidable` 时同样不得写 `confirmed`。
 - `repro` 必须含 `tier`、`claim_kind`、`command`、`expected`、`observed`、`exit_code`：`claim_kind=behavioural` 不允许配 `tier=static`；`exit_code` 为整数或 `null`（静态检查用 null）。
 - `repro.modifies_production_code=true` 时必须有 `mutation_probe`（含 `file`、`diff`、`symptom_disappeared`、`restored=true`、`post_restore_diff_empty=true`）与非空 `repro.worktree`。
 - `refuted` / `unreproducible` / `stale` / `undecidable` 都**不得** `recommendation=fix`（`unreproducible` 要修只能记 `hardening`）。
 - `stale`：`fixed_at` 为 40-hex OID、在 `--repo` 中是 commit 且是 pin 的祖先；`resolution_evidence` 至少含一条可解析的 `git show` 引用；`historical_evidence` 非空，且当修复前的 revision 与修复 commit 不同 lineage（rebase / force-push）时必须写 `historical_evidence_note` 说明两者关系。
-- `undecidable`：`missing_inputs` 非空。
+- `undecidable`：`missing_inputs` 非空（机器强制到这一步），且写明缺什么输入才能补上可复现路径——断链只允许断这一端；"写明"本身是文档义务，不是机器门禁。
 - `confirmed_symptom_mechanism_differs`：`mechanism_correction` 非空。
 - `totals` 若给出，必须是对象、键只能是 verdict、且与 `items` 的实际分布完全一致（缺键按 0 比较）。
 - `recommendation` 是给下游动作的建议，与 verdict 不是一个维度：`stale` 用 `reject_with_reason`（回复"pin 上已修"）或 `defer`；`confirmed` 用 `fix`；`unreproducible` 用 `hardening` / `needs_human`。

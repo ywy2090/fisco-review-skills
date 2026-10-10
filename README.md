@@ -2,7 +2,7 @@
 
 Three agent skills for the FISCO-BCOS C++ PR workflow. `fisco-review` and `fisco-respond` are a
 versioned pair (current: **v2.1.0**); `fisco-verify-findings` is versioned independently
-(current: **v1.1.0**).
+(current: **v1.2.0**).
 
 | Skill | Purpose |
 |---|---|
@@ -49,7 +49,7 @@ cp -r fisco-review/.agents/skills/fisco-verify-findings ~/.claude/skills/
     ├── CHANGELOG.md
     ├── evals/
     ├── references/         # intake, method, repro-recipes, report, worked example
-    └── scripts/            # validate_verification.py (+59 unit tests), verify_env.sh
+    └── scripts/            # validate_verification.py (+70 unit tests), verify_env.sh
 ```
 
 ## Provenance

@@ -55,7 +55,8 @@ premise   → "op-geth 对一致的 list 不拒" 需独立查证参考实现或 
 
 规则：
 
-- `static` 不能用来判 `confirmed` 的**行为性**声称：`repro.claim_kind=behavioural` 配 `tier=static` 会被 validator 直接拒（这条规则靠显式声明生效，所以要如实标 `structural` / `behavioural`）。"这段代码看起来会返回 INVALID"只是 hypothesis；`confirmed` 需要一个观察到的返回。
+- **完整证据链**：每个 verdict 都要两端齐备——①代码位置（`git show <PIN>:<path>:<lines>`，或"无此类代码"时 pin 锚定的 `git grep`/`git log` 扫描）+ ②`repro` 可重放命令。`refuted` 的路径是反证的重放（观察到声称的行为不发生，或输入被上游守卫提前拒绝），`stale` 的路径是"pin 上症状已不复现"的重放（修复 commit 血缘由 `fixed_at`/`resolution_evidence` 承担），`unreproducible` 的路径是"跑过但未触发"的命令与原始输出（这正是它与 `refuted` 的分界线）。只有 `undecidable` 可以断链（只能断可复现路径一端），`missing_inputs` 必须写明缺什么输入才能补上。
+- `static` 不能用来判 `confirmed` 的**行为性**声称：`repro.claim_kind=behavioural` 配 `tier=static` 会被 validator 直接拒（这条规则靠显式声明生效，所以要如实标 `structural` / `behavioural`）。"这段代码看起来会返回 INVALID"只是 hypothesis；`confirmed` 需要一个观察到的返回。`claim_kind` 标的是 **repro 实际证明的事实**的形态，不是 reviewer 措辞的形态：`stale` 的"修复已在位"核对是结构证明（标 `structural`），行为后果没跑就写进 `boundary`；反过来把行为结论用 `static` 冒充结构证明仍然被拒。
 - 优先复用已有测试：`ctest -R` 或直接跑测试二进制比新写用例更快且更可信。只有当现有用例不覆盖声称的形态时才新加 test-only 用例。
 - 新加用例放在 `$REPRO_WORKTREE`，命名钉住声称的行为（如 `new_payload_honest_retry_does_not_recommit` 式命名），跑完把用例 diff 与输出一起留在报告里；不要把测试留在 PR 分支上（这是 `fisco-respond` 的活）。
 - 打不到 `integration` 时如实记 `unreproducible` 并写清边界与已试过的替代路径，**不要**用"代码读起来一定有问题"升格为 `confirmed`。
@@ -113,6 +114,7 @@ cd "$REPRO_WORKTREE"            # detached at pin，随便造
 逐条问自己：
 
 - 一个没参与复核的人，拿着 `pin` + `command` + `observed` 能不能自己复算出我的 verdict？
+- 证据链两端都在吗——代码位置（能跳到 pin 上那一行）+ 可复现路径（能重放出同样结果）？若链断了，是不是只有可复现路径一端、且 verdict 已落 `undecidable` 并在 `missing_inputs` 写明缺什么输入？
 - 这条证据是**观察**还是**推理**？推理要么补观察，要么降级措辞。
 - reviewer 会不会指着某个子声称说"你没回应我这条"？四个子声称都要有落点。
 - `boundary` 写的是我没覆盖什么，而不是"测试通过"。

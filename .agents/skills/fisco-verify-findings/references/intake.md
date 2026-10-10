@@ -7,7 +7,7 @@
 先输出横幅，再自检：
 
 ```text
-fisco-verify-findings v1.0.0 (2026-09-10)
+fisco-verify-findings v1.2.0 (2026-10-08)
 ════════════════════════════════════════════════════════════
 🔍 VERIFY START · fisco-verify-findings · <YYYY-MM-DD HH:MM>
    <PR #N | report 路径> · <finding 条数> 条待复核

@@ -11,6 +11,10 @@ whether each verdict's obligation was met:
     historical evidence — resolves to a frozen revision, an existing blob and a
     line range inside it. This is the repo's number-one review failure: line
     numbers that drifted off the revision;
+  * the complete evidence chain is present on every item: a code location (a
+    ``git show`` citation or a pin-anchored ``git grep``/``git log`` sweep) AND
+    a replayable repro. Both ends or no verdict — only UNDECIDABLE may break
+    the chain, and it must name the missing end in ``missing_inputs``;
   * the artifact's ``pin.head``/``pin.base`` really exist in ``--repo``, so a
     fabricated pin cannot silently pass every citation check;
   * CONFIRMED / REFUTED / STALE / UNREPRODUCIBLE each satisfy their own
@@ -176,6 +180,21 @@ class PinChecker:
         )
         return None
 
+    def is_accepted_revision(self, token):
+        """A hex token a sweep anchor may lean on: the pin itself, or an
+        unambiguous prefix of it (the same disambiguation resolve_rev applies —
+        `git grep -n foo deadbeef` must not pass for a pin-anchored sweep)."""
+        if token in self.accepted:
+            return True
+        if SHORT_HEX.fullmatch(token) and any(
+            is_oid(accepted) and accepted.startswith(token) for accepted in self.accepted
+        ):
+            if self.repo is None:
+                return True
+            result = self._git("rev-parse", "--verify", f"{token}^{{commit}}")
+            return result.returncode == 0 and result.stdout.strip() in self.accepted
+        return False
+
     @staticmethod
     def _short(oid):
         return oid[:12] if isinstance(oid, str) else oid
@@ -294,6 +313,37 @@ def locator_is_readable(entry):
     return any(re.search(pattern, entry, re.I) for pattern in patterns)
 
 
+SWEEP = re.compile(r"\bgit\s+(?:grep|log|ls-tree|cat-file|diff|blame)\b")
+HEX_TOKEN = re.compile(r"\b[0-9a-f]{7,40}\b")
+
+
+def is_code_location_anchor(entry, pins=None):
+    """The chain's first end: does this entry point at code at a frozen revision?
+
+    Either a `git show <rev>:<path>` citation (checked separately) or a
+    read-only git sweep that names the pin — the form `git grep -n '<lit>' $PIN`
+    takes when the finding is about absent code and no citation can exist.
+    A sweep that leans on a bare hex token only anchors when that token is
+    (a prefix of) this artifact's own pin.
+    """
+    if not isinstance(entry, str):
+        return False
+    if parse_citations(entry):
+        return True
+    if not SWEEP.search(entry):
+        return False
+    if any(p in entry for p in PIN_PLACEHOLDERS | BASE_PLACEHOLDERS):
+        return True
+    return any(
+        pins is None or pins.is_accepted_revision(match.group(0))
+        for match in HEX_TOKEN.finditer(entry)
+    )
+
+
+def has_code_location(entries, pins=None):
+    return any(is_code_location_anchor(entry, pins) for entry in entries or [])
+
+
 def check_citations(entries, where, errors, pins, require_one=False):
     """Gate: every citation in the given evidence entries resolves."""
     checked = 0
@@ -373,6 +423,12 @@ def check_subclaims(item, where, errors, pins):
             else:
                 check_citations(entries, f"{where}.subclaims.{name}.evidence", errors, pins)
                 check_quoted_snippets(entries, f"{where}.subclaims.{name}.evidence", errors, pins)
+                if name == "location" and not has_code_location(entries, pins):
+                    errors.append(
+                        f"{where}.subclaims.location.evidence: the chain's code-location end — "
+                        "a location verdict needs a `git show <pin>:<path>:<lines>` citation or "
+                        "a pin-anchored sweep, not just prose about where the code is"
+                    )
 
     verdict = item.get("verdict")
     refuted = [
@@ -406,10 +462,12 @@ def check_repro(item, where, errors, pins):
     repro = item.get("repro")
     verdict = item.get("verdict")
     if repro is None:
-        if verdict in {"confirmed", "confirmed_symptom_mechanism_differs", "refuted"}:
+        if verdict != "undecidable":
             errors.append(
                 f"{where}: verdict={verdict} requires a repro (command, expected, "
-                "observed) — code reading yields a hypothesis, not a verification"
+                "observed) — the evidence chain is code location + replayable path, both "
+                "ends or no verdict; only undecidable may drop the repro end, and it must "
+                "name the missing end in missing_inputs"
             )
         return
     if not isinstance(repro, dict):
@@ -443,8 +501,10 @@ def check_repro(item, where, errors, pins):
         errors.append(
             f"{where}.repro.exit_code: record the exit code (use null only for a static check)"
         )
-    elif repro["exit_code"] is not None and not isinstance(repro["exit_code"], int):
-        errors.append(f"{where}.repro.exit_code: must be an integer or null")
+    elif repro["exit_code"] is not None and (
+        isinstance(repro["exit_code"], bool) or not isinstance(repro["exit_code"], int)
+    ):
+        errors.append(f"{where}.repro.exit_code: must be an integer or null (not a boolean)")
     if repro.get("modifies_production_code") not in (True, False):
         errors.append(
             f"{where}.repro.modifies_production_code: must be an explicit boolean "
@@ -570,7 +630,9 @@ def check_verdict_obligations(item, where, errors, pins):
             check_quoted_snippets(resolution, f"{where}.resolution_evidence", errors, pins)
     if verdict == "undecidable" and not nonempty_list(item.get("missing_inputs")):
         errors.append(
-            f"{where}.missing_inputs: undecidable must name the missing input that would settle it"
+            f"{where}.missing_inputs: undecidable must name the missing input that would "
+            "settle it — and which end of the evidence chain it blocks (code location or "
+            "replayable path)"
         )
     if verdict == "confirmed_symptom_mechanism_differs":
         if not nonempty_list(item.get("mechanism_correction")):
@@ -613,7 +675,7 @@ def check_historical_citations(item, where, errors, pins):
                     "citation or a located fact"
                 )
             continue
-        for rev, path, _start, _end in citations:
+        for rev, path, start, end in citations:
             if rev in PIN_PLACEHOLDERS or (is_oid(pins.pin_head) and rev == pins.pin_head):
                 errors.append(
                     f"{where}.historical_evidence[{index}]: cites the pin itself as the "
@@ -628,12 +690,27 @@ def check_historical_citations(item, where, errors, pins):
                     "in --repo — the pre-fix citation must itself be checkable"
                 )
                 continue
-            if pins.blob_at(rev, path) is None:
+            kind = pins.blob_at(rev, path)
+            if kind is None:
                 errors.append(
                     f"{where}.historical_evidence[{index}]: path {path!r} does not exist at "
                     f"{rev}"
                 )
                 continue
+            if kind != "blob":
+                errors.append(
+                    f"{where}.historical_evidence[{index}]: {path!r} is a {kind} at {rev}, "
+                    "not a file — line ranges need a blob"
+                )
+                continue
+            if start is not None:
+                total = pins.line_count(rev, path)
+                if total is not None and (start < 1 or end > total or end < start):
+                    errors.append(
+                        f"{where}.historical_evidence[{index}]: line range {start}-{end} is "
+                        f"outside {path!r} at {rev} (file has {total} lines)"
+                    )
+                    continue
             fixed_at = item.get("fixed_at")
             if is_oid(fixed_at) and pins.commit_exists(fixed_at) is not False:
                 if pins._git("merge-base", "--is-ancestor", rev, fixed_at).returncode != 0:
@@ -673,6 +750,13 @@ def validate_item(item, index, errors, pins):
     else:
         check_citations(entries, f"{where}.evidence", errors, pins)
         check_quoted_snippets(entries, f"{where}.evidence", errors, pins)
+        if not has_code_location(entries, pins):
+            errors.append(
+                f"{where}.evidence: the evidence chain is missing its code-location end — "
+                "include a `git show <pin>:<path>:<lines>` citation (or a pin-anchored "
+                "`git grep`/`git log` sweep when the finding is about absent code); a test "
+                "log or a URL is a locator, not a code location"
+            )
     check_subclaims(item, where, errors, pins)
     check_repro(item, where, errors, pins)
     check_falsification(item, where, errors)

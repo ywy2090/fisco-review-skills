@@ -2,6 +2,29 @@
 
 Semver policy: **MAJOR** = 判定语义或证据门禁的破坏性变更；**MINOR** = 新增判定、门禁或配方；**PATCH** = 措辞、链接、预算调整。
 
+## [1.2.0] - 2026-10-08
+
+新增"完整证据链"门禁（用户要求：对所有核实的问题，证据链必须含 ①代码位置 ②可复现的路径）。两端齐备才收判定；`undecidable` 是唯一允许断链的判定，且只能断可复现路径一端，`missing_inputs` 必须写明缺什么输入才能把链补全。
+
+### Added
+- **完整证据链**（核心原则首条 + 硬门禁）：每条 finding 同时给出①代码位置（pin 上 `git show <PIN>:<path>:<lines>` 引用；"缺失/无此类代码"类声称用 pin 锚定的 `git grep`/`git log` 扫描做锚点）与②可复现路径（`repro` 命令 + expected/observed/exit_code，干净 checkout 可重放）。"只有位置没有路径"= 我读了代码，"只有路径没有位置"= 知道坏不知道坏在哪，都只能算 hypothesis。
+- validator 机器门禁（`--repo` 之外的 shape-only 也生效）：
+  - item `evidence` 与 `location` 子声称必须含至少一个代码位置锚点（`git show` 引用或 pin 锚定扫描）；纯 locator（测试日志、URL、评论链接）不算位置；
+  - `repro` 从"仅 confirmed/CSMD/refuted 必填"收紧为**除 `undecidable` 外全 verdict 必填**：`stale` 带"修复已生效"的重放（结构证明 `claim_kind=structural` 即可，不必为已修复的行为硬凑构建），`unreproducible` 带"跑过但未触发"的命令与原始输出——这正是它与 `refuted` 的分界线，之前只靠 `falsification_attempts` 文字承载；
+  - `undecidable` 的 `missing_inputs` 机器上仍只强制非空；"写明缺什么输入才能补链"是文档义务，validator 的错误消息会提示。
+- `references/method.md`：复现阶梯前置完整证据链规则；明确 `claim_kind` 标的是 repro 实际证明的事实形态（stale 的修复核对标 `structural`），反向冒充（行为结论用 static 收）仍被拒。
+- `evals/evals.json` 新增 `complete-evidence-chain` 场景（evals 总数增至 12 个）。
+
+### Changed
+- `references/example-verification.json` 的 stale 项补上 `repro`（tier=static 结构核对 + pin 上真实 `git show` 输出），原来 `"repro": null` 在新门禁下不再通过。
+- skill-creator 准则复审后同步：SKILL.md 判定表 `stale`/`unreproducible` 行补上 repro 义务（此前表格滞后于新门禁）；method.md 交付前自检措辞对齐"只能断可复现路径一端"；再次清除 `scripts/__pycache__`。
+- 第二轮独立盲审（引文逐条复核）后修复：判定表 `refuted` 行与 method.md 补上 refuted 的 repro 形态（反证的重放）；report.md 的 undecidable 义务如实区分"机器强制非空 / 文档要求写明"；扫描锚点的裸 hex token 必须解析到本 artifact 的 pin（`git grep -n foo deadbeef` 不再充当代码位置）；historical_evidence 引用补 blob 类型与行范围校验；`exit_code` 拒绝布尔冒充整数；report.md schema 示例的 `--gtest_filter` 残留改为 Boost.Test 形态；intake.md 启动横幅升 v1.2.0；sibling 版本声明刷新（fisco-respond 实为 2.0.0）；清除 `.DS_Store` 并加入 `.gitignore`。
+- `references/report.md` 字段义务表新增完整证据链条目，schema 示例补 `claim_kind`。
+
+### 验证
+- `scripts/test_validate_verification.py`：70 个用例通过（证据链门禁回归 9 个：URL-only 证据被拒、locator+引用通过、pin 扫描锚点通过、外来 hex 扫描被拒、pin 前缀扫描通过、location 子声称断链被拒、stale/unreproducible 缺 repro 被拒、undecidable 断链但写明缺口通过；另 historical 行范围/目录引用 2 个、exit_code 布尔冒充 1 个）。
+- `references/example-verification.json` 在真实仓库上通过 `repo-checked`（sha256:00a5b8d4760d）。
+
 ## [1.1.0] - 2026-09-10
 
 两轮独立审查（skill-creator 准则符合性 + 对抗性门禁测试）后的修复。所有结论在改动前都先在真实仓库上复核过；审查报告里有一条断言（`b5c05a1e^` 不含 `opstack-executor/`）经核对为假，未采纳。
