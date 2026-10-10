@@ -68,6 +68,36 @@ taxonomy / report format change; MINOR = additive checklist items; PATCH = wordi
 `fisco-verify-findings` is independent: MAJOR = verdict semantics or evidence gates change;
 MINOR = new verdict, gate or reproduction recipe. See each skill's `CHANGELOG.md`.
 
+## Maintaining this repo (author side)
+
+Skills are edited in the installed copy (`~/.agents/skills/<skill>/` — that is what an agent
+loads) and published from this repo. The two are independent copies, so drift is the default
+state unless something checks it:
+
+```bash
+tools/check-install-sync.sh                              # OK / DRIFT / MISSING per skill; exit 1 on drift
+ln -sf ../../tools/pre-push-hook.sh .git/hooks/pre-push  # gate: refuse to publish drift
+SKILL_SYNC_OVERRIDE=1 git push                           # deliberate bypass, prints that it skipped
+```
+
+The checker prints the file counts it compared and a ready `rsync` command for each drifted
+skill. It never discards a tool's stderr — a `diff` that fails must not read as "0 files
+differ" (a suppressed error once reported exactly that for 11 changed files) — and it flags
+bytecode / `.DS_Store` at either end, since a published tree should carry neither.
+
+Four rules keep this honest:
+
+1. **One working copy per change.** Edit the installed skill and sync outward, or edit here and
+   copy inward — not both. The checker can tell that two trees differ; it cannot tell which one
+   is newer.
+2. **`git fetch` before every push.** A stale `origin/main` rejects the push at best; a
+   force-push around it deletes whatever landed meanwhile. Nothing in this repo needs a
+   force-push.
+3. **A rebase rewrites the commit ids.** When one becomes necessary, cite the skill's version
+   and content in notes and CHANGELOGs, never a sha that the rebase is about to invalidate.
+4. **After a sync, run the tests — not only the checker.** Byte-identical files can still ship a
+   broken suite: `python3 .agents/skills/fisco-verify-findings/scripts/test_validate_verification.py`
+
 ## Independence
 
 `fisco-verify-findings` works standalone: its reproduction recipes use plain `git` and the repo's own
