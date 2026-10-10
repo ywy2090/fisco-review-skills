@@ -1,9 +1,16 @@
 #!/usr/bin/env bash
 # pre-push gate: refuse to publish a skill whose installed copy differs from the
-# tree being pushed. The hook is not versioned, so keep this file versioned and
-# point .git/hooks/pre-push at it:
+# tree being pushed. The hook itself is not versioned, so this file is the hook's
+# body and the caller is three lines (see the README's "Wiring the gate"):
 #
-#   ln -sf ../../tools/pre-push-hook.sh .git/hooks/pre-push
+#   REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || REPO_ROOT=""
+#   if [ -n "$REPO_ROOT" ] && [ -x "$REPO_ROOT/tools/check-install-sync.sh" ]; then
+#     "$REPO_ROOT/tools/pre-push-hook.sh" >&2 || exit 1
+#   fi
+#
+# Put that block in the hook git actually runs — `git config core.hooksPath` if
+# it is set, otherwise .git/hooks/pre-push — and before that hook's final
+# `exit 0`. Keep the bypass here (not in the caller) so a bypass always prints.
 #
 # Deliberate bypass: SKILL_SYNC_OVERRIDE=1 git push
 

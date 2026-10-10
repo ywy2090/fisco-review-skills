@@ -75,10 +75,26 @@ loads) and published from this repo. The two are independent copies, so drift is
 state unless something checks it:
 
 ```bash
-tools/check-install-sync.sh                              # OK / DRIFT / MISSING per skill; exit 1 on drift
-ln -sf ../../tools/pre-push-hook.sh .git/hooks/pre-push  # gate: refuse to publish drift
-SKILL_SYNC_OVERRIDE=1 git push                           # deliberate bypass, prints that it skipped
+tools/check-install-sync.sh       # OK / DRIFT / MISSING per skill; exit 1 on drift
+SKILL_SYNC_OVERRIDE=1 git push    # deliberate bypass; the hook prints that it skipped
 ```
+
+**Wiring the gate.** Hooks run from wherever `git config core.hooksPath` points — a central
+hooks directory (a common setup) makes `.git/hooks/` inert, so install the gate where git
+actually looks, and insert it *before* that hook's final `exit 0`, since anything appended
+after an unconditional exit never runs:
+
+```bash
+REPO_ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || REPO_ROOT=""
+if [ -n "$REPO_ROOT" ] && [ -x "$REPO_ROOT/tools/check-install-sync.sh" ]; then
+  "$REPO_ROOT/tools/pre-push-hook.sh" >&2 || exit 1
+fi
+```
+
+The block is inert in every repo that does not ship the checker. Keep the bypass decision
+inside `tools/pre-push-hook.sh` (as above) rather than duplicating it in the caller — a
+caller-level bypass passes silently, and a silent bypass is the thing this gate exists to
+prevent.
 
 The checker prints the file counts it compared and a ready `rsync` command for each drifted
 skill. It never discards a tool's stderr — a `diff` that fails must not read as "0 files
