@@ -1,13 +1,13 @@
 # FISCO-BCOS Review Skills
 
 Three agent skills for the FISCO-BCOS C++ PR workflow. `fisco-review` and `fisco-respond` are a
-versioned pair (current: **v1.20.1**); `fisco-verify-findings` is versioned independently
+versioned pair (current: **v2.0.0**); `fisco-verify-findings` is versioned independently
 (current: **v1.1.0**).
 
 | Skill | Purpose |
 |---|---|
 | [`fisco-review`](.agents/skills/fisco-review/) | Review a FISCO-BCOS PR/branch (engine, executor, consensus, RPC, initializer) as the reviewer. Produces BLOCKER/HIGH/MEDIUM/LOW findings in the repo's severity-scored, round-based format. |
-| [`fisco-respond`](.agents/skills/fisco-respond/) | Process review findings on your own PR: triage each finding, fix with a regression test, and reply per thread in the `Fixed in <sha>: ...` / `Leaving X: ... because ...` format. |
+| [`fisco-respond`](.agents/skills/fisco-respond/) | Process review findings on your own PR: triage each finding, fix with a regression test, reply on each thread in one sentence (`Fixed in <sha> — ...` / `Not changed — ...`), and post a round summary reply carrying the evidence. |
 | [`fisco-verify-findings`](.agents/skills/fisco-verify-findings/) | Decide whether a review finding **actually exists** before you act on it: evidence read at one frozen revision, a re-runnable reproduction, and a verdict (`confirmed` / `confirmed_symptom_mechanism_differs` / `refuted` / `stale` / `unreproducible` / `undecidable`). Runs before `fisco-respond`: verify first, then triage, fix and reply. |
 
 ## Install

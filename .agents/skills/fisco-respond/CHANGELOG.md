@@ -4,6 +4,13 @@ Versioned as a pair with `fisco-review`; the two bump their `version:` fields in
 
 Semver policy: **MAJOR** = change to the reply format or the triage/fix semantics; **MINOR** = additive (new traps, new checklist references); **PATCH** = wording, link, or budget tweaks.
 
+## [2.0.0] - 2026-09-15
+### Changed (reply format — the house definition, which this skill had drifted from)
+- **Inline replies are one sentence.** `Fixed in <short-sha> — <one sentence: what changed>`, `Fixed in <short-sha> — <changed part>; <unchanged part> kept as-is because <reason>`, `Not changed — <one sentence, evidence-based reason>`. The em dash is the separator; the old `Fixed in <sha>: <change>; covered by the new <test_name> test.` colon-plus-semicolon template is gone, and so is the invented `Leaving <X>:` reject form (the house vocabulary is `Not changed` / `Partially adopted` / `Fixed incidentally` / `Acknowledged, logged for follow-up` / `Pending decision`).
+- **The round summary reply is mandatory** and now has a shape in step 7 (first line `@<reviewer> — …`, `## Reply summary` status table, per-finding block with Verify / Behaviour change / Test coverage / Rationale, `## Verification`, `## Follow-ups`). It is a PR issue comment, not another thread reply, and it is where the mechanism, the named test, the verification path, the behaviour-change disclosure and the rejection's evidence live — previously this skill left step 7 as "frame the next round" with no format, so the detail piled up in the threads.
+- Inline threading made explicit: `POST repos/$REPO/pulls/$PR/comments` with `in_reply_to`; no `@mention` inline (the thread already notifies), `Feel free to resolve.` only in the summary, GitHub prose English even for a Chinese-language finding.
+- New trap entry for the failure this fixes: a multi-sentence inline reply, or no round summary at all — the most repeated miss on the author side (reported three times against the sibling skill's B.3 rule).
+
 ## [1.20.1] - 2026-09-06
 ### Changed
 - Lockstep bump with fisco-review 1.20.1 (reachability-probe severity-by-consumer rule + #5549 capacity/txHash example). No independent content change.

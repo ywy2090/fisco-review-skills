@@ -4,6 +4,11 @@ Versioned as a pair with `fisco-respond` (reviewer checklist lives here at `refe
 
 Semver policy: **MAJOR** = change to the finding taxonomy / severity semantics / report format (a finding produced under v1 may be interpreted differently under v2); **MINOR** = additive (new checklist items, new modes, new code conventions); **PATCH** = wording, link, or budget tweaks.
 
+## [2.0.0] - 2026-09-15
+### Changed (lockstep with fisco-respond 2.0.0 — the shared author-reply format)
+- The reply format this side cites now matches the house definition: `Fixed in <sha> — …` / `Not changed — …`, one sentence inline with the evidence in the round summary reply. Step 9's per-finding response line and step 3's "author replies" pull changed from the old colon form (`"Fixed in <sha>: …"`, `"Leaving X: because …"`), so the reviewer side no longer reads a format the author side has stopped writing.
+- No change to the finding taxonomy, severity semantics, or report format; the pair's version moves because the round protocol's reply format is shared, and the version is stamped into every report footer.
+
 ## [1.20.1] - 2026-09-06
 ### Changed
 - Reachability probe (step 6) now carries the severity-by-consumer rule with the #5549 capacity/txHash example: an asymmetry is only half the finding — trace the consumer's path in *each* shape before grading. Filed LOW as "the consumer checks `OpRejectIsCapacity` before evicting", the hash-less capacity fault actually fell through `culprit.has_value()` to `-32603` — the "safe" branch was dead code, and the real severity was HIGH (kyonRay round-3 F1).

@@ -1,7 +1,7 @@
 ---
 name: fisco-respond
-version: 1.20.1
-description: Process a review of your own FISCO-BCOS C++ PR — triage each severity-tagged finding, fix it with a regression test, and reply on each comment thread in the repo's "Fixed in <sha>: ..." / "Leaving X: ... because ..." format. Use when your FISCO-BCOS PR has review comments or review rounds to address, when a reviewer posts BLOCKER/HIGH/MEDIUM/LOW findings on your diff, or when you must respond to a reviewer before the next round. Not for reviewing a PR (your own or someone else's) — that is fisco-review.
+version: 2.0.0
+description: Process a review of your own FISCO-BCOS C++ PR — triage each severity-tagged finding, fix it with a regression test, reply on each comment thread with one sentence ("Fixed in <sha> — ..." / "Not changed — ..."), and post a round summary reply carrying the evidence. Use when your FISCO-BCOS PR has review comments or review rounds to address, when a reviewer posts BLOCKER/HIGH/MEDIUM/LOW findings on your diff, or when you must respond to a reviewer before the next round. Not for reviewing a PR (your own or someone else's) — that is fisco-review.
 ---
 
 # Respond to a FISCO-BCOS review (author side)
@@ -19,15 +19,51 @@ This repo's reviews (see the #5544/#5547 engine-split history) are **round-based
 3. **Decide per finding — three outcomes:**
    a. **Fix.** Fix the *root cause*, not the symptom — reviewers state what is not an acceptable fix (e.g. "adding the missing ids to `evicted` without collapsing the duplicated body is explicitly not the fix"). Prefer consolidating duplicated code into one shared helper over patching one of the copies (the record's fixes: shared `putStaged`, single `requireGetPayloadShape`, single `engine_common::makeStatus`). Add a **regression test named after the pinned behaviour** that fails before the fix (`new_payload_honest_retry_does_not_recommit`, `newPayloadV3CompareFieldsSurviveEngineHelper`). If the finding is about a behaviour change, disclose it in-code with an issue reference and in the PR description.
    b. **Partial fix.** If you resolve only part of a finding (e.g. `makeStatus` consolidated but the same finding's `TrackedHeadBlock` duplicate left behind), say exactly which half remains open — reviewers re-read the whole finding at the next head.
-   c. **Reject / leave as-is.** Reviewers accept a well-reasoned rejection (the record kept `rlp-protocol` PUBLIC). Your reply must show the design is correct *including consequence analysis* ("engine is a STATIC library; consumers that pull `EngineServiceCommon.o` need the transitive symbols, so PRIVATE would drop the link") — not "I disagree".
+   c. **Reject / leave as-is.** Reviewers accept a well-reasoned rejection (the record kept `rlp-protocol` PUBLIC). The thread gets the one sentence (`Not changed — <reason>`); the summary-reply block for that finding must show the design is correct *including consequence analysis* ("engine is a STATIC library; consumers that pull `EngineServiceCommon.o` need the transitive symbols, so PRIVATE would drop the link") — not "I disagree".
 4. **Commit discipline.** Small commits, repo message style `type(scope): …`. The record's fix commit is `fix(engine): close review findings on side-by-side infra` — reference the severity tiers (BLOCKER/HIGH/MEDIUM/LOW; the repo's history sometimes wrote these as P0–P2) or the round. Keep test-only fixes as their own commit when cleaner.
 5. **Verify — every touched target — then reply on each inline thread.** Verification closure: enumerate every build/test target the fix diff touches and compile + run each one; "suite green" claims must name the affected-target list. A test added in `bcos-rpc` while the loop runs only `test-bcos-engine` has verified nothing (the cited evidence must be the target that actually contains the test). Before posting any reply, check it is truthful against your own branch: the `short-sha` exists (`git log --format=%h <ref>`), the fix is actually present at that commit (`git show <sha> --stat` lists the changed file), and the named test exists and asserts the pinned behaviour.
-   The verification plan comes from the **tree, never from your own commit message** — after the named mechanism check, ask the reachability question the reviewer will ask: *who can reach the new code or branch, with what inputs, over which wire/method versions* (answered by greps over the branch, not by re-reading the commit description); a fix that adds a gate, guard, or narrow branch is verified against every honest caller it now touches, not only against the test that pins it. Then reply in the repo's formats:
-   - Fix: `Fixed in <short-sha>: <code-level change>; covered by the new <test_name> test.` Name the actual mechanism and the test — the reviewer verifies both at the next head.
-   - Reject: `Leaving <X>: <reason + consequence>.`
+   The verification plan comes from the **tree, never from your own commit message** — after the named mechanism check, ask the reachability question the reviewer will ask: *who can reach the new code or branch, with what inputs, over which wire/method versions* (answered by greps over the branch, not by re-reading the commit description); a fix that adds a gate, guard, or narrow branch is verified against every honest caller it now touches, not only against the test that pins it. Then reply in the repo's formats — **one sentence inline, all evidence in the round summary reply (step 7)**:
+   - Fix: `Fixed in <short-sha> — <one sentence: what changed>`. Append `file:line` only when it is part of that sentence.
+   - Partial fix: `Fixed in <short-sha> — <changed part>; <unchanged part> kept as-is because <reason>`.
+   - Reject: `Not changed — <one sentence, evidence-based reason>`.
+   - **Inline is one sentence. Hard constraint.** The mechanism, the named test, the verification path, the behaviour-change note and the consequence analysis go to the summary reply, not the thread. A finding that seems to need three sentences in the thread is a summary-reply paragraph plus a one-sentence pointer on the thread; a multi-sentence inline reply dilutes the reviewer's one-glance read of "fixed" and reads as neither status nor evidence.
+   - Post inline replies as thread replies (`POST repos/$REPO/pulls/$PR/comments` with `body` + `in_reply_to`); the thread already notifies the reviewer, so no `@mention` inline. `Feel free to resolve.` belongs in the summary reply, never inline.
+   - GitHub prose is English even when the finding was filed in Chinese.
    - Don't reply with empty bodies, and don't resolve a thread you haven't changed or justified.
 6. **Disclose before the next round.** If the fix changes what the live service answers (status codes, comparison width, version windows), update the PR description (the repo tracks such leftover semantics in a "Leftover semantics" note) and the ChangeLog if Engine API behaviour is tracked there. Re-check your test-plan checkboxes. **Verify the disclosure against the code before pushing**: a disclosed behaviour (the description says "answers SYNCING", "compares 16 fields") must equal what the code does — a mis-disclosure blocks the reviewer's convergence and reads as a new finding.
-7. **Push a new head and frame the next round.** State which prior findings are closed at `<sha>` and which items you deliberately left, so the reviewer can re-check quickly instead of rediscovering.
+7. **Push a new head, then post the round summary reply.** The summary is a PR issue comment — not another thread reply — and it is where every detail the inline replies deliberately omit belongs: per-finding status, the mechanism, the named test, the verification path, the behaviour-change disclosure, and the rejection's evidence. Its first line is `@<reviewer> — <overall handling status>` and it names the head you just pushed (the reviewer re-checks every prior finding at that sha); `Feel free to resolve.` appears here and nowhere else. When several reviewers filed findings, post one summary per reviewer, each opening with its own `@mention`.
+   Shape (the reviewer re-checks prior findings against it):
+
+   ```markdown
+   @<reviewer> — <overall handling status, naming the pushed head sha>
+
+   ## Reply summary
+
+   | # | Finding | Status | Commit |
+   |---|---------|--------|--------|
+   | 1 | <finding> | Fixed | <sha> |
+   | 2 | <finding> | Not changed | — |
+
+   ## Finding <N> — <status>
+
+   <what changed, 1–2 sentences>
+
+   - **Verify**: <file:line or `git show` command>
+   - **Behaviour change**: <compatibility impact, or "none">
+   - **Test coverage**: <test names, and what each asserts>
+   - **Rationale**: <reference semantics, or the rejection's evidence>
+
+   ## Verification
+
+   - <affected build/test targets and their results>
+   - <finding-to-verification mapping>
+
+   ## Follow-ups
+
+   - <what was deferred, why, and the owner/condition>
+   ```
+
+   Status vocabulary: `Fixed` / `Fixed incidentally` / `Partially adopted` / `Not changed` / `Acknowledged, logged for follow-up` / `Pending decision`. State which prior findings are closed at `<sha>` and which you deliberately left, so the reviewer can re-check quickly instead of rediscovering.
 
 ## Traps from this repo's history
 
@@ -36,6 +72,7 @@ This repo's reviews (see the #5544/#5547 engine-split history) are **round-based
 - **A fix that closes one half of a finding** and misses the second half the same finding named.
 - **A regression test that asserts the outcome but not the invariant the finding named** (a retry test that asserts VALID twice but never counts commits). Strengthen it when the reviewer's scenario depends on the invariant.
 - **Fixing on the wrong branch/worktree** — you verify a fix against files that are not the PR branch, or commit to the wrong ref. Always `git log`/`git show` against your branch before and after the fix.
+- **A multi-sentence inline reply, or no round summary at all** — the two halves of one miss, and this skill's most repeated. Inline is one sentence (`Fixed in <sha> — …` / `Not changed — …`); the mechanism, the test name, the verification path and the behaviour-change note are summary-reply material. The reviewer reads the thread for status and the summary for evidence — a thread carrying both reads as neither.
 - **Rejecting without verifiable reasoning** — the reviewer re-checks at the head; make your justification derivable from code.
 - **A rejection whose *form* is right but whose *technical claim* is wrong** — a rejection that states a mechanism and a consequence is only as good as its technical premise. Verify the premise independently (e.g. does `PRIVATE` on a static library really drop the transitive link, or does `$<LINK_ONLY:...>` keep it? does the version really not need the lower version's check?), not just that the argument reads coherently. A false premise, stated confidently, survives the round and gets repeated.
 
@@ -44,6 +81,10 @@ These are the headline traps from the record; the complete fix-reintroduction ch
 ## Self-check before pushing
 
 Re-read your fix diff against the self-check reference in `references/self-check.md` (code conventions + fix-reintroduction traps) — a fix that introduces a new instance of a listed class will reopen the round.
+
+## Reply self-check before posting
+
+Per thread: exactly one sentence — `Fixed in <short-sha> — …`, `Fixed in <short-sha> — <changed part>; <unchanged part> kept as-is because <reason>`, or `Not changed — <reason>`. No test name, no verification path, no rationale, no second sentence in the thread. Then the round summary reply: it exists, it opens with `@<reviewer> — …` naming the pushed head, it carries every finding's status plus the mechanism / test coverage / verification / rationale you kept out of the threads, and it is the only place `Feel free to resolve.` appears. A reply you cannot compress to one sentence is not a longer reply — it is a summary block you have not written yet.
 
 ## Maintenance
 
