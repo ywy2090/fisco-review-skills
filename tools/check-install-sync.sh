@@ -154,6 +154,33 @@ if [ "$ALL_ROOTS" -eq 1 ]; then
         done
         [ "$seen" -eq 0 ] && printf '    (no other root holds a copy)\n'
     done
+
+    # A backup-looking directory inside a root is loaded as a skill whenever it
+    # carries a SKILL.md — the skill's identity is its frontmatter name, not its
+    # directory name, so `foo.bak-20260101/` becomes a second `foo`. This has
+    # bitten twice on this machine; the scan is cheap and belongs with the sweep
+    # rather than in the pre-push gate (another host's stray backup must not
+    # block a skills-repo push).
+    printf '\nbackup-looking directories inside the roots\n'
+    for rel in "${root_list[@]}"; do
+        base="$HOME/$rel"
+        [ -d "$base" ] || continue
+        for entry in "$base"/*/; do
+            entry=${entry%/}
+            name=$(basename "$entry")
+            case "$name" in
+                *.bak*|*.old|*.orig|*_bak|*.disabled|*backup*|*Backup*|*copy) ;;
+                *) continue ;;
+            esac
+            if [ -f "$entry/SKILL.md" ]; then
+                printf '  LOADED AS DUPLICATE  %s/%s  name=%s\n' \
+                       "$rel" "$name" "$(skill_name "$entry")"
+                status=1
+            else
+                printf '  inert (no SKILL.md)  %s/%s\n' "$rel" "$name"
+            fi
+        done
+    done
 fi
 
 # Published trees must carry no bytecode or OS droppings, even untracked ones.
