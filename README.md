@@ -76,8 +76,17 @@ state unless something checks it:
 
 ```bash
 tools/check-install-sync.sh       # OK / DRIFT / MISSING per skill; exit 1 on drift
+tools/check-install-sync.sh --all-roots   # + where else each skill is installed, and whether it agrees
 SKILL_SYNC_OVERRIDE=1 git push    # deliberate bypass; the hook prints that it skipped
 ```
+
+`--all-roots` sweeps the conventional skill roots under the home directory and, per published
+skill, lists every copy found **by frontmatter name** (never by directory name) with one of
+`same` / `DIFFERS`, whether it is a `copy` or a `symlink -> target`, and whether the root itself
+is a symlink. The classification matters: a root that symlinks to another root cannot drift, and
+a skill directory that symlinks into the install root is the same content, not a second copy.
+Drift found by the sweep counts toward the exit status; the pre-push gate runs without the flag,
+so publishing is gated only on the installed copy.
 
 **Wiring the gate.** Hooks run from wherever `git config core.hooksPath` points — a central
 hooks directory (a common setup) makes `.git/hooks/` inert, so install the gate where git

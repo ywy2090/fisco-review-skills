@@ -1,27 +1,54 @@
 #!/usr/bin/env bash
 # Author-side consistency check: does every skill published in this repo match
-# the copy installed on this machine?
+# the copies installed on this machine?
 #
-#   tools/check-install-sync.sh [--quiet]
+#   tools/check-install-sync.sh [--quiet] [--all-roots]
 #
-# Exit 0 = in sync, 1 = drift (details on stdout). The installed root defaults
-# to ~/.agents/skills and can be overridden with SKILL_SYNC_INSTALLED (the
-# pre-push hook and the tests use that).
+# Exit 0 = in sync, 1 = drift (details on stdout).
 #
-# Design notes, from three real failures on 2026-10-10:
+#   --quiet      suppress the per-file diff listing and the rsync hints
+#   --all-roots  additionally sweep the conventional skill roots under the home
+#                directory and report, per published skill, every copy found by
+#                frontmatter name — including copies in roots this machine does
+#                not load. Drift found there counts toward the exit status,
+#                because "the copies disagree" is the condition being watched;
+#                the pre-push gate deliberately runs without this flag so that
+#                publishing is gated only on the installed copy.
+#
+# SKILL_SYNC_INSTALLED overrides the installed root (default ~/.agents/skills);
+# SKILL_ROOTS overrides the colon-separated sweep list.
+#
+# Design notes, from four real failures on 2026-10-10:
 #  - stderr is never discarded: a `diff` that errors must not read as "no
 #    differences" (a suppressed error once reported "0 files differ" for 11).
 #  - every line prints the file counts it compared, so a green result is
 #    auditable rather than a bare "OK".
 #  - bytecode and OS droppings are excluded on both sides, and the repo side is
 #    additionally checked for tracked artifacts that should never be published.
+#  - a skill's identity is its frontmatter `name:`, never its directory name:
+#    a copy can sit under a differently named directory.
 
 set -uo pipefail
 
 REPO_ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 INSTALLED_ROOT=${SKILL_SYNC_INSTALLED:-$HOME/.agents/skills}
 QUIET=0
-[ "${1:-}" = "--quiet" ] && QUIET=1
+ALL_ROOTS=0
+for arg in "$@"; do
+    case "$arg" in
+        --quiet)     QUIET=1 ;;
+        --all-roots) ALL_ROOTS=1 ;;
+        *) echo "unknown option: $arg" >&2; exit 2 ;;
+    esac
+done
+
+DEFAULT_ROOTS=".agents/skills:.claude/skills:.codex/skills:.cursor/skills:\
+.gemini/skills:.copilot/skills:.codeium/windsurf/skills:.continue/skills:\
+.qoder/skills:.trae/skills:.kiro/skills:.roo/skills:.factory/skills:\
+.augment/skills:.zencoder/skills:.config/opencode/skills:.config/goose/skills:\
+.hermes/skills:.workbuddy/skills:.cc-switch/skills:.openhands/skills:.qwen/skills:\
+.codebuddy/skills:.openclaw/skills:.vibe/skills:.junie/skills:.cline/skills"
+ROOTS=${SKILL_ROOTS:-$DEFAULT_ROOTS}
 
 count_files() {
     find "$1" -type f \
@@ -29,12 +56,34 @@ count_files() {
         | wc -l | tr -d ' '
 }
 
+# Content hash of a skill tree, name-and-content, order-independent of mtimes.
+tree_hash() {
+    local dir=$1 tool
+    tool=$(command -v shasum || command -v sha256sum) || return 1
+    (
+        cd "$dir" || return 1
+        find . -type f ! -name '*.pyc' ! -path '*__pycache__*' ! -name '.DS_Store' \
+            -print0 | LC_ALL=C sort -z \
+        | while IFS= read -r -d '' f; do
+            printf '%s\n' "$f"
+            "$tool" "$f" 2>/dev/null | awk '{print $1}'
+        done
+    ) | "$tool" 2>/dev/null | awk '{print substr($1,1,12)}'
+}
+
+skill_name() {
+    grep -m1 '^name:' "$1/SKILL.md" 2>/dev/null \
+        | sed 's/^name:[[:space:]]*//; s/[[:space:]]*$//'
+}
+
 status=0
 printf 'installed root: %s\n' "$INSTALLED_ROOT"
 
+published=()
 for skill_path in "$REPO_ROOT"/.agents/skills/*/; do
     name=$(basename "$skill_path")
     [ -f "$skill_path/SKILL.md" ] || continue
+    published+=("$skill_path")
     live="$INSTALLED_ROOT/$name"
 
     if [ ! -d "$live" ]; then
@@ -52,19 +101,54 @@ for skill_path in "$REPO_ROOT"/.agents/skills/*/; do
     if [ -z "$diff_out" ] && [ "$diff_rc" -eq 0 ]; then
         printf 'OK       %-24s identical (installed %s / repo %s files)\n' \
                "$name" "$n_live" "$n_repo"
-        continue
-    fi
-
-    status=1
-    printf 'DRIFT    %-24s installed %s / repo %s files (diff exit %s)\n' \
-           "$name" "$n_live" "$n_repo" "$diff_rc"
-    if [ "$QUIET" -eq 0 ]; then
-        printf '%s\n' "$diff_out" | sed 's/^/           /'
-        printf '           sync installed -> repo:\n'
-        printf '             rsync -a --exclude __pycache__ --exclude .DS_Store "%s/" "%s"\n' \
-               "$live" "$skill_path"
+    else
+        status=1
+        printf 'DRIFT    %-24s installed %s / repo %s files (diff exit %s)\n' \
+               "$name" "$n_live" "$n_repo" "$diff_rc"
+        if [ "$QUIET" -eq 0 ]; then
+            printf '%s\n' "$diff_out" | sed 's/^/           /'
+            printf '           sync installed -> repo:\n'
+            printf '             rsync -a --exclude __pycache__ --exclude .DS_Store "%s/" "%s"\n' \
+                   "$live" "$skill_path"
+        fi
     fi
 done
+
+if [ "$ALL_ROOTS" -eq 1 ]; then
+    printf '\nsweep of the conventional roots (SKILL_ROOTS overrides; %s entries)\n' \
+           "$(printf '%s' "$ROOTS" | tr ':' '\n' | wc -l | tr -d ' ')"
+    IFS=':' read -r -a root_list <<<"$ROOTS"
+    for skill_path in "${published[@]}"; do
+        skill=$(skill_name "$skill_path")
+        ref_hash=$(tree_hash "$skill_path")
+        printf '  %s  (repo hash %s)\n' "$skill" "$ref_hash"
+        seen=0
+        for rel in "${root_list[@]}"; do
+            base="$HOME/$rel"
+            [ -d "$base" ] || continue
+            root_note=""
+            [ -L "$base" ] && root_note=" [root is a symlink -> $(readlink "$base")]"
+            # Globs, not `find`: find does not descend symlinked directories, so a
+            # root that is a symlink (or a skill dir that is one) would be skipped
+            # silently — a miss that reads as "no other copy exists".
+            for dir in "$base"/*/; do
+                dir=${dir%/}
+                [ -f "$dir/SKILL.md" ] || continue
+                [ "$(skill_name "$dir")" = "$skill" ] || continue
+                seen=$((seen + 1))
+                h=$(tree_hash "$dir")
+                if [ "$h" = "$ref_hash" ]; then mark='same   '; else mark='DIFFERS'; status=1; fi
+                kind="copy"
+                [ -L "$dir" ] && kind="symlink -> $(readlink "$dir")"
+                printf '    %s  v%-8s  %-22s %s%s\n' "$mark" \
+                       "$(grep -m1 '^version:' "$dir/SKILL.md" 2>/dev/null \
+                          | sed 's/^version:[[:space:]]*//; s/[[:space:]]*$//')" \
+                       "$rel" "$kind" "$root_note"
+            done
+        done
+        [ "$seen" -eq 0 ] && printf '    (no other root holds a copy)\n'
+    done
+fi
 
 # Published trees must carry no bytecode or OS droppings, even untracked ones.
 stray=$(find "$REPO_ROOT/.agents/skills" -type f \( -name '*.pyc' -o -name '.DS_Store' \) 2>/dev/null | wc -l | tr -d ' ')
