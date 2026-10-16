@@ -2,6 +2,23 @@
 
 Distilled from the engine-split review history (PRs #5544/#5547–#5550, rounds 1–3 by kyonRay, author responses by ywy2090) plus the codebase's own conventions. Read this before reviewing the diff.
 
+## Family index (question → items)
+
+Items are numbered for citation stability, not read in order — enter by the question you are asking. Folded items keep their numbers as aliases (→) so citations keep resolving. The **hard cap is 55 numbers**: a new item may only be added by retiring or folding an overlapping one, unless a golden-set miss maps to no existing item.
+
+| Question | Items |
+|---|---|
+| Is the claim (description / comment / stated cause) true? | 1, 3, 7, 53 |
+| Does the test actually prove anything? | 4, 21, 38, 52, 55 |
+| Who consumes this return / gate / capability / artifact? | 16, 22, 29 (incl. 44→), 55 |
+| Is the version/shape gate right in both directions? | 20 (incl. 49→), 40 |
+| Does the include/link graph hold (case, visibility, macros, packages)? | 28, 36, 51, 54 |
+| Copy and state economics (what is copied, what survives an exit)? | 9, 26 (incl. 27→), 43, 45 |
+| Locks and shared state | 13, 19, 34 |
+| Duplication and same-name splits | 5, 21, 24, 37 |
+| Terminal answers, sentinels, canonical sources | 11, 12, 14, 39 |
+| Mechanical greps over every touched file | 30, 31, 32 |
+
 ## Module map
 
 - `engine/bcos-engine/` — `EngineServiceImpl` (legacy production Engine API service), `EngineServiceCommon.{h,cpp}` (shared validators + `engine_common`), `EngineTracker` (forkchoice state, `PayloadCache`), `PayloadCache`, and Eth/Op service slices landing in later PRs.
@@ -73,7 +90,7 @@ High-consequence bugs: consensus fork, data loss, data races, UB, lost user tran
 
 19. ****Shared state mutated outside the lock** — mutating shared state outside the critical section (a non-atomic counter between release and re-acquire) is a data race; make it atomic or move it inside the guard. → 本仓库：`nextPayloadID()` 锁外自增 `m_nextPayloadSequence`。
 
-20. ****Version/shape requirements are cumulative, not layered** — a higher version's response or wire shape usually *embeds* the lower version's full field set; a gate or requirement keyed only to the lower version (e.g. `v == N` or `v < N`) drops its protection exactly where the shape is widest. When you see a version-bounded predicate, ask whether the upper bound exists because higher versions genuinely don't need the check, or because the author assumed they don't. → 本仓库：`requireGetPayloadShape` 的 `requestVersion < V4` 上界让 V4/V5 跳过 V3 字段检查，而 V4/V5 响应内嵌完整 V3 字段集。
+20. ****Version/shape requirements are cumulative, not layered — and checked in both directions** — a higher version's response or wire shape usually *embeds* the lower version's full field set; a gate or requirement keyed only to the lower version (e.g. `v == N` or `v < N`) drops its protection exactly where the shape is widest. When you see a version-bounded predicate, ask whether the upper bound exists because higher versions genuinely don't need the check, or because the author assumed they don't. Then run the gate **both ways** (folds #49): a value it must reject, a value it must now accept, and the inverse combinations (old shape through the new gate, new shape through the old path) — a gate tested in one direction is half-verified, and the missing direction is usually the one that drops protection where the shape is widest. → 本仓库：`requireGetPayloadShape` 的 `requestVersion < V4` 上界让 V4/V5 跳过 V3 字段检查，而 V4/V5 响应内嵌完整 V3 字段集；同一实例的拒绝侧审计即 #49 的方向。
 
 ## Defect classes — consistency & hygiene
 
@@ -89,9 +106,9 @@ Lower-consequence: duplicated or divergent logic, dead code, API-shape hazards. 
 
 25. ****Dead code / stale comments** — unused members, duplicate helpers, comments naming consumers that don't exist in-tree, tests asserting a pre-fix outcome, clang-format-only churn outside scope.
 
-26. ****`optional::value_or` on a const lvalue deep-copies** — `const std::optional<std::vector<T>>&` + `.value_or(std::vector<T>{})` selects the by-value overload: the whole container is allocated-copied-freed to read one `.size()`. Grep `value_or(std::vector` under a `const&` parameter; the non-copying form is the ternary on `has_value()`. → 本仓库：`payloadAttributes.transactions.value_or(...)` 在 `reserve()` 里每次 payload 构建深拷贝至多 ~16 MB（#5548 F3）。
+26. ****Container-copy economics (incl. #27)** — count the copies a diff introduces, in both shapes: (a) the silent per-call copy — `const std::optional<std::vector<T>>&` + `.value_or(std::vector<T>{})` selects the by-value overload, allocating-copying-freeing the whole container to read one `.size()`; grep `value_or(std::vector` under a `const&` parameter (the non-copying form is the ternary on `has_value()`); (b) the copy count under any exclusive guard (folds #27) — whole-map/vector snapshots for rollback, whole-cache duplicates, per-entry receipt vectors at bounded capacity ×N; a count of 3 in one critical section is the finding even when each copy is individually correct and bounded. → 本仓库：`payloadAttributes.transactions.value_or(...)` 在 `reserve()` 里每次 payload 构建深拷贝至多 ~16 MB（#5548 F3）；`commitRetainedPayload`/`publishBuiltPayload` 在 tracker 排他锁内做三份全容器拷贝（#5548 F7）。
 
-27. ****Bulk container copies inside an exclusive guard** — count the copies a PR introduces under any exclusive lock/mutex guard: whole-map/vector snapshots for rollback, whole-cache duplicates, per-entry receipt vectors at bounded capacity ×N. A copy count of 3 (snapshot cache + snapshot map + internal duplicate) in one critical section is the finding, even when each is individually correct and bounded. → 本仓库：`commitRetainedPayload`/`publishBuiltPayload` 在 tracker 排他锁内做三份全容器拷贝（#5548 F7）。
+27. **[Folded into #26]** — bulk copies inside an exclusive guard are #26's second shape. Number kept as an alias. → 本仓库：`commitRetainedPayload`/`publishBuiltPayload`（#5548 F7）.
 
 ## Scorecard dimensions (this repo's convention)
 
@@ -119,7 +136,7 @@ When full mode delegates modules to parallel sub-agents:
 ## Defect classes — portability & protocol boundaries
 
 28. ****Include-case parity** — for every new header, the filename must match every include of it byte-for-byte. A case mismatch compiles on macOS/Windows and breaks every Linux TU — a compile break invisible to a case-insensitive CI, so flag as HIGH even when the author's platform is green.
-29. ****Protocol-contract returns** — when a function's bool/int return encodes success/failure for a protocol (EVMC host interface, DMC resume protocol), verify every caller consumes it. A discarded return whose failure path only logs and then falls through to success-path bookkeeping is a HIGH fail-open finding.
+29. ****Protocol-contract returns and changed channels — sweep every caller** (incl. #44) — when a function's bool/int return encodes success/failure for a protocol (EVMC host interface, DMC resume protocol), verify every caller consumes it; a discarded return whose failure path only logs and then falls through to success-path bookkeeping is a HIGH fail-open finding. The same sweep governs any **changed channel** (folds #44): `assert` → `BOOST_THROW_EXCEPTION`, a return-type change, a default flipping to fail-closed — who catches, who propagates, who now fails closed where it previously terminated or silently continued. The evidence is the caller sweep, not the changed line; same-TU siblings consuming the same missing-data family count as callers. → 本仓库（#44）：`computeHash()` returned a value where the new throw required an `Error::UniquePtr` channel (#5434 r4 F2).
 
 ## Mechanical checks (run over every touched file)
 
@@ -159,7 +176,7 @@ Thirteen items migrated from the sibling corpus (`fisco-review-pr` 2.13.x + `fis
 
 43. **Coroutine parameter and frame lifetime** — a coroutine's parameters live in the frame: a default argument that materialises a temporary bound to a `const&` (e.g. `task::Task` default `= {}`) leaves the frame referencing an object that dies at the end of the full-expression, so the first `co_await` resumes into a dangling read. Check every coroutine parameter that is neither a value nor an owner. → 出处：lesson L-20260818-004 (the corpus's highest trigger count, ×20, graduated into its check #21); 本仓库：PR #5434 r1 (`SchedulerSerialImpl.h`), re-fired at `TxValidator::admit` (#5503-r2).
 
-44. **Fix side effects: sweep every caller of the changed channel** — a change to an error channel (`assert` → `BOOST_THROW_EXCEPTION`, a return type, a default flipping to fail-closed) is not audited until every caller is: who catches, who propagates, who now fails closed where it previously terminated or silently continued. The evidence is the caller sweep, not the changed line. Same-TU siblings that consume the same missing-data family count as callers. → 出处：old check #9 + lesson L-20260818-002；本仓库：PR #5434 r4 F2 (`computeHash()` returned a value where the new throw required an `Error::UniquePtr` channel).
+44. **[Folded into #29]** — the caller sweep for changed error channels is now #29's second half. Number kept as an alias for citations and `lessons-pending.md` revival targets. → 出处：old check #9 + lesson L-20260818-002；本仓库：`computeHash()` (#5434 r4 F2).
 
 45. **Residual state and return semantics** — success, error and empty must not share one return, and a reentrant submission path (the same input arriving twice, a retry after a failed durable write) is at least the high tier: the second write is a consensus-state hazard. Ask what is left behind when the path exits early, and what a retry observes. → 出处：old check #10 + lesson L-20260904-004；本仓库：PR #5547 replay F1 (a human reviewer graded the duplicate-submission / second-write shape one tier above this skill's).
 
@@ -169,7 +186,7 @@ Thirteen items migrated from the sibling corpus (`fisco-review-pr` 2.13.x + `fis
 
 48. **API name vs behaviour** — a name implying a behaviour the implementation does not have is a finding, not a naming preference: `mergeView` merging the oldest pending layer rather than the view just pushed, a `…For`/`…From`/`can…` prefix reading as a predicate when it is not. Where a name is genuinely ambiguous, the docstring must disambiguate explicitly. → 出处：lesson L-20260818-005 (graduated to the corpus's check #25, its last free slot); 本仓库：PR #5434 morebtcg F2 (`MultiLayerStorage.h:mergeView` is FIFO).
 
-49. **Gate bidirectionality (the inverse combination)** — #20 asks whether a version/shape requirement is cumulative; this asks the mirror question. Exercise the gate **both ways** — a value it must reject, a value it must now accept, and the inverse combinations (old shape through the new gate, new shape through the old path). A gate tested in one direction only is half-verified, and the missing direction is usually the one that drops protection where the shape is widest. → 出处：old check #12；本仓库：the same #5549 instance as #20 (`requestVersion < V4`), audited from the rejection side.
+49. **[Folded into #20]** — gate bidirectionality is now #20's second question (exercise the gate both ways, plus the inverse combinations). This number is kept as an alias so citations (and `lessons-pending.md` revival targets) keep resolving. → 出处：old check #12；本仓库：the same #5549 instance as #20, audited from the rejection side.
 
 50. **Compile coverage for a header-only / INTERFACE target** — a target that ships as headers is exercised only by whatever TU includes them: if no TU includes all the newly added main headers, compile errors are invisible while CI stays green. Require the probe (one TU including every new main header, built) and treat its absence as a high-severity coverage finding, not a nit. → 出处：lesson L-20260820-002；本仓库：PR #5455 — `opstack-executor` is INTERFACE-only and 4 main headers (1,420 lines) had zero compile coverage, masking two CRITICALs (a broken type chain and references to deleted `eth::applyStateDiff` / `ZeroBlockHashes`).
 
@@ -178,3 +195,11 @@ Thirteen items migrated from the sibling corpus (`fisco-review-pr` 2.13.x + `fis
 52. **Pinned expectations must be discriminating** — an expectation any sibling implementation also satisfies pins nothing: an exception type shared by three production sites (the distinct `what()` is the discriminator), a field-count assertion, or an equivalence test that pins two copies against a third. Run [M11](methods.md) and require a unique signal. → 出处：old check #19 + lesson L-20260826-006；本仓库：PR #5495-r11 (`BOOST_CHECK_THROW` on type only, three production sites with distinct `what()`).
 
 53. **Causal attribution is verified, not accepted** — the ninth rule of the verification-discipline block above, numbered here so no existing reference moves. A stated root cause ("this breaks because of the unity build", "the author's `PRIVATE` drops the transitive link", "the fix closes the gap") is itself a claim: trace the actual chain X→Y before repeating it. Getting the *direction* right does not make every sub-claim right, and a confidently-worded wrong premise survives the round and gets quoted forward. This applies to the reviewer's own attribution as much as to the author's. → 出处：the sibling corpus's most-repeated lesson (×12: PR #5434 r3 attributed a break to unity-build instantiation; at r4 the reviewer self-corrected — the placement was wrong, the mechanism was not unity build).
+
+## Defect classes — execution-model lessons (v2.2.0, from the #5615 multi-model runs)
+
+Two items graduated from the 2026-10 #5615 experiment (nine arms across three external executors vs a 65-finding ground-truth key, plus a CI-red attribution probe all executors failed). Numbering continues: nothing above is renumbered.
+
+54. **Third-party header resolution path** — a `#include` that resolves through an installed dependency's include directory (`-isystem <vcpkg_installed>/...`, a package's *test* header, a port-shipped header) is a dependency contract, not a repo fact: the include compiles wherever the package's port happens to install that header and breaks wherever it doesn't. When a new/changed file includes a header that is **not in the materialized tree**, resolve it against the build's actual search paths and name which package + port provides it; a package-internal or test-only header is a finding even when the build is currently green (the next port revision or a clean CI install silently drops it). The mirror discipline applies to *attribution*: a "missing header" CI red on a clean checkout while the author's machine is green is the signature of exactly this class — dependency drift, not author error, and not "environment flake" either. → 出处：the #5615 attribution probe (2026-10): `<test/utils/rlp.hpp>` resolved via evmone@0.21.0's installed test header — present in the author's local install, absent from CI's same-version install (port drift); all three executors and the first human pass mis-filed it as a PR build-config defect.
+
+55. **Declared coverage must have a consumer** *(the wiring member of the #4/#38/#52 test-vacuity family — those ask whether a test proves anything; this asks whether the declared judge is even wired in)* — any artifact that *claims* judging or coverage — an oracle JSON naming the test that consumes it, a "this suite gates X" comment, a corpus manifest, a newly added test source — is verified by grepping for its **real, CI-wired consumer**: a test target that compiles the source, a runner that executes the suite, a test that actually reads the file. A declared judge with no consumer, or a new test compiled into no target, is a finding of the *coverage claim* (usually MEDIUM even when nothing is wrong with the artifact's content), and the PR description's coverage claims inherit the same check. This is the "wiring" half of target closure (#7 states what *was* run; this states that what the diff *says* runs, runs). → 出处：#5615 ground truth (2026-10): an oracle JSON claiming a judging test with no C++ consumer (F31), 3 of 4 new Python suites with no CI runner (F37), and a new manifest-checking test compiled into no target — none found by any of nine executor arms despite the artifacts being in every package.

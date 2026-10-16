@@ -4,6 +4,15 @@ Versioned as a pair with `fisco-review`; the two bump their `version:` fields in
 
 Semver policy: **MAJOR** = change to the reply format or the triage/fix semantics; **MINOR** = additive (new traps, new checklist references); **PATCH** = wording, link, or budget tweaks.
 
+## [2.2.1] - 2026-10-12
+- Lockstep version bump with `fisco-review` 2.2.1 (checklist family index + three folds; no change on this side — the reply format, evidence gate and traps are untouched).
+
+## [2.2.0] - 2026-10-12
+### Added (lockstep with fisco-review 2.2.0 — lessons from the #5615 multi-model runs)
+- **Evidence-gate items 5 & 7** — item 5 now names the mechanical check: run the reviewer side's `fisco-review/scripts/verify_findings.py` over your own quotes once before pushing (it caught every drifted or hand-edited quote that a confident re-read had passed). New item 7: **CI-red attribution is verified against a clean checkout's dependency set, not your machine** — "green locally, red on CI, therefore flaky" is exactly wrong for the dependency-drift class (the red is deterministic on every clean checkout and invisible on the author's machine; #5615's head carried such a red for days behind "all green locally": `<test/utils/rlp.hpp>` present in the local evmone@0.21.0 install, absent from CI's same-version install).
+- **Two new traps** — a severity dispute that argues by adjective (mirror of the reviewer's downgrade-without-citation rule: quote the severity clause and show which condition fails; upgrades hidden inside fixes disclose, not absorb); "environment flake" as an unfalsifiable rejection (the falsifiable answer names a mechanism — which dependency, which port revision, which include path — and re-running a red is cheap, *recording why it was red* is what survives the round).
+- **Self-check: fix-face blind re-review (optional, historically paid-for)** — reviewer pipeline over just the fix delta with no access to the author's reasoning; the #5615 fix-face blind pass caught 9 transcription-level compile breaks the author's own re-reads had passed, one introduced by the author's own reformatting fix.
+
 ## [2.1.0] - 2026-10-10
 ### Added (merging the sibling author-side corpus — `fisco-handle-reviews` 1.10.x — into this skill)
 - **"The `Fixed` evidence gate" (new section)** — six conditions, all required before a `Fixed` reply leaves: the finding was reproduced at the head first; every touched target was built and run with a regression that fails before the fix and passes after; the commit is on the PR's **live head chain** (re-read after pushing — a local-only commit is not a fix); class-level findings have a completed **category scan**, not just the named instance; every cited `file:line` was re-read at the final commit (fix commits drift lines — three drifts caught in one round at #5544); and an **independent verifier** confirms high-tier or behaviour-changing fixes, barred explicitly from reading the author's drafted reply or reasoning. A condition that cannot be checked leaves the item at `Pending decision` — never at `Fixed`.

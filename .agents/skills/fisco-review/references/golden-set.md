@@ -28,3 +28,24 @@ The skill is not uniformly worse — it filed 7 findings kyonRay missed at the s
 1. **When changing the skill** (new checklist item, delegation rule, mode): state which golden entry it makes the skill hit. If none, it is unverified growth and should not be added without a fresh, named finding — a rule with an incident but no ground truth goes to [lessons-pending.md](lessons-pending.md) as a candidate instead, and graduates (gaining both an item and an entry here) only after ≥2 triggers across ≥2 PRs or ≥2 independent modules.
 2. **When the skill next reviews a PR**: after the report, check whether any golden signal was present in the diff and whether the skill hit it. A golden signal present but unhit is a regression regardless of what else the report says.
 3. **Cost discipline**: the golden set is the reason the delegation budget is now a hard cap and cross-file symmetry moved to the aggregator — G1/G5 are cross-file, and the parallel round that missed them also ran 2.4–5.6M tokens per agent. Recall and cost are tracked together.
+
+## Golden entries from the #5615 multi-model runs (2026-10-12 graduated)
+
+A second golden cohort with a different provenance: not one missed review, but **nine executor arms** (three external models × single-pass/agentic/skill-guided modes) run against the same PR #5615 head (`b561cbecb`) and scored against this skill's own 65-finding full-blind ledger as ground truth. Ground truth was produced by the native (GLM) executor running this same skill; the arms' union reached 53/65. The 12 never-found findings are the regression set — when this skill (or its executor) changes, these are the entries that must start hitting. Experiment record: `.agents/experiments/model-ab-5615/` (frozen packages sha256, per-arm outputs, mechanical evidence gate, `reports/skill-battle.md`).
+
+| # | Never-found finding | Severity | Now maps to | Trigger signal |
+|---|---|---|---|---|
+| G9 | `parseOpEip1559Params` accepts >uint32 fields the loader refuses; truncation at extraData encoding | MEDIUM (F7) | #46 numeric width/parse strictness | a config parser whose acceptance is wider than the encoder's field width |
+| G10 | dual-declaration check re-implements the fold rule; fold result discarded | MEDIUM (F9) | #42 gate-vs-producer reconciliation | two code paths enforcing one rule, one re-derived instead of shared |
+| G11 | profile suite pins a test-local fork ladder; production selection pinned by nothing | MEDIUM (F26) | #52 pinned expectations must be discriminating | a test's fixture world stands in for the production table |
+| G12 | t8n corpus readers hard-fail on plain clone, bypassing the `FISCO_REQUIRE_T8N_CORPUS` gate contract | MEDIUM (F33) | #55 declared coverage must have a consumer | a corpus gate whose failure mode differs between CI and clean clone |
+| G13 | two genesis-state-root implementations cross-pinned on a single one-account vector | MEDIUM (F34) | #21/#42 duplicate implementations + fixture strength | two impls of one job "verified" against one shared trivial vector |
+| G14 | 3 of 4 new Python suites have no CI runner | MEDIUM (F37) | #55 | a suite that exists, passes locally, and is run by nothing |
+| G15 | run.sh leaves the variant applied on two failure paths ("restore on ANY exit" claim false) | MEDIUM (F39) | #45 residual state on early exit | a cleanup claim covering paths the script does not actually take |
+| G16 | mutant binaries stay built after the source restore | MEDIUM (F40) | #45 | restore semantics checked on sources only, not on built artifacts |
+| G17 | oracle JSON claims a judging test that does not exist | MEDIUM (F31) | #55 | an artifact that names its consumer without the consumer existing |
+| G18 | vacuous self-comparing assertion (hash of X vs hash of X) | LOW (F53) | #38 self-referential oracle | both sides of an equality derived from the same expression |
+| G19 | withdrawals-root expectations derived from the same helper the seal uses | LOW (F59) | #38 | expectation helper == production helper |
+| G20 | optional-field matrix omits the computed-only cell it claims complete | LOW (F60) | #40 wire-shape matrix | a matrix that enumerates input cells but not derived-only cells |
+
+Plus two **process** goldens that measure the executor, not the checklist — both failed by at least one arm and both now fenced by step 8's v2.2.0 rules: a unit-level BLOCKER surviving into the final report (hard-target reconciliation), and a severity change citing no clause (severity-change citation). The attribution probe (dependency-drift CI red mis-filed as diff defect by all arms) graduates as checklist #54.
