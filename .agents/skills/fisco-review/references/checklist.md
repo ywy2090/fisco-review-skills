@@ -18,6 +18,8 @@ Items are numbered for citation stability, not read in order — enter by the qu
 | Duplication and same-name splits | 5, 21, 24, 37 |
 | Terminal answers, sentinels, canonical sources | 11, 12, 14, 39 |
 | Mechanical greps over every touched file | 30, 31, 32 |
+| Did the fixing break or newly expose anything? | 7, 25, 29 (incl. 44→), 45 |
+| Can two nodes/lanes derive different addresses, roots or receipts? | severity lens (SKILL.md), 12, 17, 39 |
 
 ## Module map
 
@@ -58,7 +60,7 @@ These eight govern how every defect class below is applied — which signals to 
 
 6. **Primitive-contract grep** — every storage/sync primitive's in-code WARNING/contract comment (`MultiLayerStorage.h` 的 "must drain the deque first" 等) is grepped against every new caller the PR introduces; the contract header documents the failure mode, and a caller that doesn't honour it is a finding. → 本仓库：push_front / merge_back 的 deque 语义警告对两个 Engine 服务的提交序列各漏一次（#5548 F1）。
 
-7. **Adversarial audit of round-requested fixes** — when a prior round's response ADDS infrastructure (a limiter, a gate, a helper, a shared comment), the next round audits the added thing's own coupling and failure modes, not only whether it satisfies the original finding. Verification that is acceptance-shaped ("all five sites now warn ✓") is how a shared rate-limit gate's cross-site suppression survived to the next reviewer (→ #5548 F5).
+7. **Adversarial audit of round-requested fixes** — when a prior round's response ADDS infrastructure (a limiter, a gate, a helper, a shared comment), the next round audits the added thing's own coupling and failure modes, not only whether it satisfies the original finding. Verification that is acceptance-shaped ("all five sites now warn ✓") is how a shared rate-limit gate's cross-site suppression survived to the next reviewer (→ #5548 F5). **Widened by the #5689 retrospective (G22/G23/G24): every fix delta is its own diff to re-hunt** — a catch added for one finding re-shaped the lane's fault policy into fail-open receipts (G22), a conjunct added while fixing another contradicted a contract in the same diff (G24), and a defensive probe added for a hypothesised state became the next round's finding (G23). A guard added to defend a state first runs the producer sweep ([M14](methods.md)): no writer of the state ⇒ the guard is the finding.
 
 8. **Residual-gap language may not stay prose** — every "not exercised / residual gap / only the pre-merge throw is tested" sentence in a verification boundary or "not a problem" note must end as either a finding or an explicit accepted-risk statement naming who owns it. → 本仓库：round-4 写下 "mid-merge-throw is not directly exercised" 却未转成 finding，下一个 reviewer 以此为据点开 HIGH（#5548 F1）。
 

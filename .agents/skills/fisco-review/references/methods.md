@@ -98,6 +98,16 @@ Also verify the inner payload is fully consumed and the outer input has no resid
 
 **Provenance.** Old corpus `methods.md` M2/M4/M6/M12 + lesson L-20260827-001 (PR #5549).
 
+## M14 — Producer sweep for claimed state reachability (new in v2.3.0)
+
+**Trigger.** Any finding whose mechanism asserts that a state **can or cannot exist**: a defensive guard "defending" a hazard, an "unreachable / no writer produces it" claim used to attack or justify a code path, or a cache/keying decision resting on what some row "normally names".
+
+**Steps.** (1) Enumerate **every writer** of the state — grep the row/field's write sites across the tree, including genesis, migration, state-import and self-destruct/cleanup paths, not just the obvious `setX` callers; (2) for each writer, check the invariant the claim rests on (e.g. "the row is the chain hash of the body it stores") against that writer's own code; (3) decide from the table: **no writer produces the state** ⇒ the guard is the finding (it costs a read on every hit and its justification comment is a claim — item 3); **a writer produces it** ⇒ the guard/omission is the finding, with the writer named in the citation so the next round can re-check it.
+
+**Completion.** The writer table is complete and each writer's invariant is stated from its code. "I could not find a writer" is `blocked`, never a defence — the sweep is the falsification, and a hypothesised hazard without a producer is exactly the false positive this method exists to kill.
+
+**Provenance.** #5689 retrospective (2026-10-16), golden G23: the executable-cache backing probe was added to defend a `CODE_HASH`-not-backed state; the round that asked for it never swept the writers, and the external reviewer's "I looked for a writer that can produce such a row and found none" refuted the premise — the probe and two crafted-state test cells died the next round.
+
 ---
 
 Method ids M2, M4, M6, M9 and M12 are deliberately not migrated (see the header note). If a header-purge or dependency-boundary PR needs the full symbol→header table and transitive-chain trace, the sibling corpus `fisco-review-pr/references/` + `fisco-review-shared/` still carries them.

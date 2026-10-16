@@ -1,6 +1,6 @@
 ---
 name: fisco-respond
-version: 2.2.1
+version: 2.3.0
 description: Process a review of your own FISCO-BCOS C++ PR — triage each severity-tagged finding, fix it with a regression test, reply on each comment thread with one sentence ("Fixed in <sha> — ..." / "Not changed — ..."), and post a round summary reply carrying the evidence. Use when your FISCO-BCOS PR has review comments or review rounds to address, when a reviewer posts BLOCKER/HIGH/MEDIUM/LOW findings on your diff, or when you must respond to a reviewer before the next round. Not for reviewing a PR (your own or someone else's) — that is fisco-review.
 ---
 

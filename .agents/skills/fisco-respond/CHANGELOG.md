@@ -4,6 +4,13 @@ Versioned as a pair with `fisco-review`; the two bump their `version:` fields in
 
 Semver policy: **MAJOR** = change to the reply format or the triage/fix semantics; **MINOR** = additive (new traps, new checklist references); **PATCH** = wording, link, or budget tweaks.
 
+## [2.3.0] - 2026-10-16
+### Added (lockstep with `fisco-review` 2.3.0 — the #5689 two-reviewer-stream retrospective)
+- **`references/self-check.md` trap 20** — a fix that adds a defensive guard for a hypothesised state must first sweep every writer of that state (genesis / migration / import / self-destruct paths included) and name the producer at the guard's comment, or state plainly that no producer exists and why that is safe. A guard defending an unreachable state costs a read per hit, its justification comment is a claim, and it dies as the next round's finding — the #5689 backing probe and its two crafted-state test cells were removed exactly that way one round after they landed.
+
+### Notes
+- The reply format, the `Fixed` evidence gate and traps 1-19 are untouched — MINOR, one additive trap. Versioned in lockstep with `fisco-review` 2.3.0 (whose severity lens and fix-face pass the author side mirrors: a severity dispute and a fix-face re-review were already covered by traps and the self-check).
+
 ## [2.2.1] - 2026-10-12
 - Lockstep version bump with `fisco-review` 2.2.1 (checklist family index + three folds; no change on this side — the reply format, evidence gate and traps are untouched).
 
